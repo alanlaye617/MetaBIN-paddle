@@ -45,8 +45,8 @@ for i in range(5):
     reprod_log_pad.add("forwards_test_%d"%(i), pad_outputs.detach().numpy())
     del pad_outputs, pad_inputs
 
-reprod_log_ref.save('result/forward_ref.npy')
-reprod_log_pad.save('result/forward_paddle.npy')
+reprod_log_ref.save('./result/forward_ref.npy')
+reprod_log_pad.save('./result/forward_paddle.npy')
 
 diff_helper = ReprodDiffHelper()
 
