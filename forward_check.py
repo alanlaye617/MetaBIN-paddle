@@ -22,28 +22,28 @@ reprod_log_pad = ReprodLogger()
 torch_path = "./data/backbone.pth"
 paddle_path = "./data/backbone.pdparams"
 
-ref_model = build_ref_model().backbone.cuda()
-torch.save(ref_model.state_dict(), torch_path)
-ref_model.eval()
+model_ref = build_ref_model().backbone.cuda()
+torch.save(model_ref.state_dict(), torch_path)
+model_ref.eval()
 
 torch2paddle(torch_path, paddle_path)
 
-pad_model = build_resnet_backbone()
-pad_model.set_state_dict(paddle.load(paddle_path))
-pad_model.eval()
+model_pad = build_resnet_backbone()
+model_pad.set_state_dict(paddle.load(paddle_path))
+model_pad.eval()
 
 for i in range(5):
     inputs = np.random.rand(16, 3, 256, 128)
 
-    ref_inputs = torch.tensor(inputs, dtype=torch.float32).cuda()
-    ref_outputs = ref_model(ref_inputs)
-    reprod_log_ref.add("forwards_test_%d"%(i), ref_outputs.cpu().detach().numpy())
-    del ref_outputs, ref_inputs
+    inputs_ref = torch.tensor(inputs, dtype=torch.float32).cuda()
+    outputs_ref = model_ref(inputs_ref)
+    reprod_log_ref.add("forwards_test_%d"%(i), outputs_ref.cpu().detach().numpy())
+    del outputs_ref, inputs_ref
 
-    pad_inputs = paddle.to_tensor(inputs, dtype=paddle.float32)
-    pad_outputs = pad_model(pad_inputs)
-    reprod_log_pad.add("forwards_test_%d"%(i), pad_outputs.detach().numpy())
-    del pad_outputs, pad_inputs
+    inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float32)
+    outputs_pad = model_pad(inputs_pad)
+    reprod_log_pad.add("forwards_test_%d"%(i), outputs_pad.detach().numpy())
+    del outputs_pad, inputs_pad
 
 reprod_log_ref.save('./result/forward_ref.npy')
 reprod_log_pad.save('./result/forward_paddle.npy')
