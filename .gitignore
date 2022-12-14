@@ -1,5 +1,7 @@
 refs/*
 !refs/reference
+datasets/*
+datasets/lite_data
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
