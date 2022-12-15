@@ -2,6 +2,7 @@ refs/*
 !refs/reference
 datasets/DukeMTMC-reID
 datasets/Market-1501-v15.09.15
+test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
