@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import paddle
 
-def torch2paddle(torch_path, paddle_path):
+def weight_translate(torch_path, paddle_path):
     torch_state_dict = torch.load(torch_path)
     fc_names = ["classifier"]
     in_names = 'ins_n'
@@ -30,4 +30,4 @@ def torch2paddle(torch_path, paddle_path):
 if __name__ == '__main__':
     torch_path = "./data/backbone.pth"
     paddle_path = "./data/backbone.pdparams"
-    torch2paddle(torch_path, paddle_path)
+    weight_translate(torch_path, paddle_path)
