@@ -7,6 +7,45 @@
 import copy
 import logging
 import os
+from paddle.io import Dataset
+import numpy as np
+from PIL import Image, ImageOps
+
+def read_image(file_name, format=None):
+    """
+    Read an image into the given format.
+    Will apply rotation and flipping if the image has such exif information.
+    Args:
+        file_name (str): image file path
+        format (str): one of the supported image modes in PIL, or "BGR"
+    Returns:
+        image (np.ndarray): an HWC image
+    """
+    #with PathManager.open(file_name, "rb") as f:
+    with open(file_name, "rb") as f:
+        image = Image.open(f)
+
+        # capture and ignore this bug: https://github.com/python-pillow/Pillow/issues/3973
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        if format is not None:
+            # PIL only supports RGB, so convert to RGB and flip channels over below
+            conversion_format = format
+            if format == "BGR":
+                conversion_format = "RGB"
+            image = image.convert(conversion_format)
+        image = np.asarray(image)
+        if format == "BGR":
+            # flip channels if needed
+            image = image[:, :, ::-1]
+        # PIL squeezes out the channel dimension for "L", so make it HWC
+        if format == "L":
+            image = np.expand_dims(image, -1)
+        image = Image.fromarray(image)
+        return image
 
 
 class Dataset(object):
@@ -59,39 +98,6 @@ class Dataset(object):
 
     def __len__(self):
         return len(self.data)
-
-    # def __add__(self, other):
-    #     """Adds two datasets together (only the train set)."""
-    #     train = copy.deepcopy(self.train)
-    #
-    #     for img_path, pid, camid in other.train:
-    #         pid += self.num_train_pids
-    #         camid += self.num_train_cams
-    #         train.append((img_path, pid, camid))
-    #
-    #     ###################################
-    #     # Things to do beforehand:
-    #     # 1. set verbose=False to avoid unnecessary print
-    #     # 2. set combineall=False because combineall would have been applied
-    #     #    if it was True for a specific dataset, setting it to True will
-    #     #    create new IDs that should have been included
-    #     ###################################
-    #     if isinstance(train[0][0], str):
-    #         return ImageDataset(
-    #             train, self.query, self.gallery,
-    #             transform=self.transform,
-    #             mode=self.mode,
-    #             combineall=False,
-    #             verbose=False
-    #         )
-    #     else:
-    #         return VideoDataset(
-    #             train, self.query, self.gallery,
-    #             transform=self.transform,
-    #             mode=self.mode,
-    #             combineall=False,
-    #             verbose=False
-    #         )
 
     def __radd__(self, other):
         """Supports sum([dataset1, dataset2, dataset3])."""
@@ -214,78 +220,44 @@ class ImageDataset(Dataset):
         logger.info('  gallery  | {:5d} | {:8d} | {:9d}'.format(num_gallery_pids, len(self.gallery), num_gallery_cams))
         logger.info('  ----------------------------------------')
 
-# class VideoDataset(Dataset):
-#     """A base class representing VideoDataset.
-#     All other video datasets should subclass it.
-#     ``__getitem__`` returns an image given index.
-#     It will return ``imgs``, ``pid`` and ``camid``
-#     where ``imgs`` has shape (seq_len, channel, height, width). As a result,
-#     data in each batch has shape (batch_size, seq_len, channel, height, width).
-#     """
-#
-#     def __init__(self, train, query, gallery, seq_len=15, sample_method='evenly', **kwargs):
-#         super(VideoDataset, self).__init__(train, query, gallery, **kwargs)
-#         self.seq_len = seq_len
-#         self.sample_method = sample_method
-#
-#         if self.transform is None:
-#             raise RuntimeError('transform must not be None')
-#
-#     def __getitem__(self, index):
-#         img_paths, pid, camid = self.data[index]
-#         num_imgs = len(img_paths)
-#
-#         if self.sample_method == 'random':
-#             # Randomly samples seq_len images from a tracklet of length num_imgs,
-#             # if num_imgs is smaller than seq_len, then replicates images
-#             indices = np.arange(num_imgs)
-#             replace = False if num_imgs >= self.seq_len else True
-#             indices = np.random.choice(indices, size=self.seq_len, replace=replace)
-#             # sort indices to keep temporal order (comment it to be order-agnostic)
-#             indices = np.sort(indices)
-#
-#         elif self.sample_method == 'evenly':
-#             # Evenly samples seq_len images from a tracklet
-#             if num_imgs >= self.seq_len:
-#                 num_imgs -= num_imgs % self.seq_len
-#                 indices = np.arange(0, num_imgs, num_imgs / self.seq_len)
-#             else:
-#                 # if num_imgs is smaller than seq_len, simply replicate the last image
-#                 # until the seq_len requirement is satisfied
-#                 indices = np.arange(0, num_imgs)
-#                 num_pads = self.seq_len - num_imgs
-#                 indices = np.concatenate([indices, np.ones(num_pads).astype(np.int32) * (num_imgs - 1)])
-#             assert len(indices) == self.seq_len
-#
-#         elif self.sample_method == 'all':
-#             # Samples all images in a tracklet. batch_size must be set to 1
-#             indices = np.arange(num_imgs)
-#
-#         else:
-#             raise ValueError('Unknown sample method: {}'.format(self.sample_method))
-#
-#         imgs = []
-#         for index in indices:
-#             img_path = img_paths[int(index)]
-#             img = read_image(img_path)
-#             if self.transform is not None:
-#                 img = self.transform(img)
-#             img = img.unsqueeze(0)  # img must be torch.Tensor
-#             imgs.append(img)
-#         imgs = torch.cat(imgs, dim=0)
-#
-#         return imgs, pid, camid
-#
-#     def show_summary(self):
-#         num_train_pids, num_train_cams = self.parse_data(self.train)
-#         num_query_pids, num_query_cams = self.parse_data(self.query)
-#         num_gallery_pids, num_gallery_cams = self.parse_data(self.gallery)
-#
-#         print('=> Loaded {}'.format(self.__class__.__name__))
-#         print('  -------------------------------------------')
-#         print('  subset   | # ids | # tracklets | # cameras')
-#         print('  -------------------------------------------')
-#         print('  train    | {:5d} | {:11d} | {:9d}'.format(num_train_pids, len(self.train), num_train_cams))
-#         print('  query    | {:5d} | {:11d} | {:9d}'.format(num_query_pids, len(self.query), num_query_cams))
-#         print('  gallery  | {:5d} | {:11d} | {:9d}'.format(num_gallery_pids, len(self.gallery), num_gallery_cams))
-#         print('  -------------------------------------------')
+
+class CommDataset(Dataset):
+    """Image Person ReID Dataset"""
+
+    def __init__(self, img_items, transform=None, relabel=True):
+        self.img_items = img_items
+        self.transform = transform
+        self.relabel = relabel
+
+        self.pid_dict = {}
+        if self.relabel:
+            pids = list()
+            for i, item in enumerate(img_items):
+                if item[1] in pids: continue
+                pids.append(item[1])
+            self.pids = pids
+            self.pid_dict = dict([(p, i) for i, p in enumerate(self.pids)])
+
+    def __len__(self):
+        return len(self.img_items)
+
+    def __getitem__(self, index):
+        if len(self.img_items[index]) > 3:
+            img_path, pid, camid, others = self.img_items[index]
+        else:
+            img_path, pid, camid = self.img_items[index]
+            others = ''
+        img = read_image(img_path)
+        if self.transform is not None: img = self.transform(img)
+        if self.relabel: pid = self.pid_dict[pid]
+        return {
+            "images": img,
+            "targets": pid,
+            "camid": camid,
+            "img_path": img_path,
+            "others": others
+        }
+
+    @property
+    def num_classes(self):
+        return len(self.pids)

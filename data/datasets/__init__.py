@@ -1,2 +1,3 @@
-from data.datasets.dukemtmcreid import DukeMTMC
-from data.datasets.market1501 import Market1501
+from dukemtmcreid import DukeMTMC
+from market1501 import Market1501
+from bases import *
