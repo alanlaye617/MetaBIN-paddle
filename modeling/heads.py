@@ -4,7 +4,7 @@ import paddle.nn.functional as F
 from .ops import meta_norm, meta_linear, meta_conv2d
 
 class MetalearningHead(nn.Layer):
-    def __init__(self, name_scope=None, dtype="float32"):
+    def __init__(self, num_classes, name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
         norm_opt = dict()
         norm_opt['BN_AFFINE'] = True
@@ -25,7 +25,7 @@ class MetalearningHead(nn.Layer):
        # self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt, bias_freeze=True)
         self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt)
 
-        num_classes = 751
+        num_classes = num_classes
         # cls_type = linear
         self.classifier_fc = meta_linear(in_feat, num_classes, weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(0, 0.001)), bias_attr=False)
 
