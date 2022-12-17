@@ -1,9 +1,9 @@
 import paddle
 import paddle.io
-from transforms import build_transforms
+from .transforms import build_transforms
 from .datasets import DukeMTMC, Market1501
 from .datasets import CommDataset
-import samplers
+import data.samplers as samplers
 
 
 
@@ -16,7 +16,7 @@ def create_dataset(dataset_name, root='datasets'):
         raise KeyError('Unknown dataset:', dataset_name)
 
 
-def make_sampler(train_set, batch_size, num_instance, num_workers,
+def create_sampler(train_set, batch_size, num_instance, num_workers,
                  mini_batch_size, drop_last=True, naive_way=True, delete_rem=True, seed=None, camera_to_domain=None):
     if naive_way:
         data_sampler = samplers.NaiveIdentitySampler(data_source=train_set.img_items,
@@ -69,17 +69,7 @@ def fast_batch_collator(batched_inputs):
     """
 
 
-train_loader_kwargs = {
-    'drop_last': True,         # cfg.DATALOADER.DROP_LAST,
-    'naive_way': True,         # cfg.DATALOADER.NAIVE_WAY,
-    'delete_rem': False
-}
 
-meta_loader_kwargs = {
-    'drop_last': True,
-    'naive_way': False,
-    'delete_rem': False
-}
 
 
 def build_reid_train_loader(dataset_names, num_workers,
@@ -87,8 +77,9 @@ def build_reid_train_loader(dataset_names, num_workers,
                             mtrain_batch_size, mtrain_num_instance,
                             mtest_batch_size, mtest_num_instance,
                             train_loader_kwargs, meta_loader_kwargs,
-                            synth_flag=False, camera_to_domain=True, meta_loader_flag='diff', meta_data_names='DG', 
-                            seed=None, world_size=1
+                            meta_loader_flag='diff', meta_data_names='DG',
+                            synth_flag=False, camera_to_domain=True, 
+                            world_size=1, seed=None
                             ):
     """
     meta_data_names: META.DATA.NAMES
@@ -108,8 +99,8 @@ def build_reid_train_loader(dataset_names, num_workers,
 
     # load datasets
     for name in dataset_names:
-        assert name in dataset, KeyError('Unknown dataset: ' + name)
         dataset = create_dataset(name)
+        # dataset.train: (path, pid, camid, domain)
         if len(dataset.train[0]) < 4:
             for i, x in enumerate(dataset.train):
                 additional_info = {}
@@ -135,7 +126,7 @@ def build_reid_train_loader(dataset_names, num_workers,
     if (synth_transforms is not None) and (meta_data_names != ""): # used for synthetic (not used in MetaBIN)
         synth_set = CommDataset(train_items, synth_transforms, relabel=True)
     
-    train_loader = make_sampler(
+    train_loader = create_sampler(
         train_set=train_set,
         batch_size=train_batch_size,                        # cfg.SOLVER.IMS_PER_BATCH,
         num_instance=train_num_instance,                    # cfg.DATALOADER.NUM_INSTANCE,
@@ -144,6 +135,7 @@ def build_reid_train_loader(dataset_names, num_workers,
         drop_last=train_loader_kwargs['drop_last'],         # cfg.DATALOADER.DROP_LAST,
         naive_way=train_loader_kwargs['naive_way'],         # cfg.DATALOADER.NAIVE_WAY,
         delete_rem=train_loader_kwargs['delete_rem'],       # cfg.DATALOADER.DELETE_REM,
+        camera_to_domain=camera_to_domain,
         )
     
 
@@ -164,11 +156,11 @@ def build_reid_train_loader(dataset_names, num_workers,
     else:
         print('error in meta_loader_flag', meta_loader_flag)
 
-    train_loader_add['mtrain'] = [] if make_mtrain else None
-    train_loader_add['mtest'] = [] if make_mtest else None
+    mtrain_loader = [] if make_mtrain else None
+    mtest_loader = [] if make_mtest else None
 
     if make_mtrain: # meta train dataset
-        train_loader_add['mtrain'] = make_sampler(
+        mtrain_loader = create_sampler(
             train_set=train_set,
             batch_size=mtrain_batch_size,                       #cfg.META.DATA.MTRAIN_MINI_BATCH,
             num_instance=mtrain_num_instance,                   #cfg.META.DATA.MTRAIN_NUM_INSTANCE,
@@ -177,12 +169,15 @@ def build_reid_train_loader(dataset_names, num_workers,
             drop_last=meta_loader_kwargs['drop_last'],          # cfg.META.DATA.DROP_LAST,
             naive_way=meta_loader_kwargs['naive_way'],          # cfg.META.DATA.NAIVE_WAY,
             delete_rem=meta_loader_kwargs['delete_rem'],        # cfg.META.DATA.DELETE_REM,
+            camera_to_domain=camera_to_domain,
             seed = seed
             )
+    else:
+        mtrain_loader = None
 
     if make_mtest: # meta train dataset
         if synth_transforms is None:
-            train_loader_add['mtest'] = make_sampler(
+            mtest_loader = create_sampler(
                 train_set=train_set,
                 batch_size=mtest_batch_size,                        # cfg.META.DATA.MTEST_MINI_BATCH,
                 num_instance=mtest_num_instance,                    # cfg.META.DATA.MTEST_NUM_INSTANCE,
@@ -191,9 +186,10 @@ def build_reid_train_loader(dataset_names, num_workers,
                 drop_last=meta_loader_kwargs['drop_last'],          # cfg.META.DATA.DROP_LAST,
                 naive_way=meta_loader_kwargs['naive_way'],          # cfg.META.DATA.NAIVE_WAY,
                 delete_rem=meta_loader_kwargs['delete_rem'],        # cfg.META.DATA.DELETE_REM,
+                camera_to_domain=camera_to_domain,
                 seed = seed)
         else:
-            train_loader_add['mtest'] = make_sampler(
+            mtest_loader = create_sampler(
                 train_set=synth_set,
                 batch_size=mtest_batch_size,                        # cfg.META.DATA.MTEST_MINI_BATCH,
                 num_instance=mtest_num_instance,                    # cfg.META.DATA.MTEST_NUM_INSTANCE,
@@ -202,12 +198,14 @@ def build_reid_train_loader(dataset_names, num_workers,
                 drop_last=meta_loader_kwargs['drop_last'],          # cfg.META.DATA.DROP_LAST,
                 naive_way=meta_loader_kwargs['naive_way'],          # cfg.META.DATA.NAIVE_WAY,
                 delete_rem=meta_loader_kwargs['delete_rem'],        # cfg.META.DATA.DELETE_REM,
+                camera_to_domain=camera_to_domain,
                 seed = seed)
-    return train_loader, train_loader_add, num_domains
+    else:
+        mtest_loader = None
+    return train_loader, mtrain_loader, mtest_loader, num_domains
 
 
-
-def build_reid_test_loader(dataset_name, num_workers, batch_size, flag_test=True):
+def build_reid_test_loader(dataset_name, batch_size, num_workers=2, flag_test=True):
     test_transforms = build_transforms(is_train=False)
     dataset = create_dataset(dataset_name) 
     if flag_test:
@@ -226,3 +224,42 @@ def build_reid_test_loader(dataset_name, num_workers, batch_size, flag_test=True
     return test_loader, len(dataset.query)
 
 
+def build_train_loader_for_m_resnet(batch_size=96, num_instance=4, num_workers=2, world_size=1, seed=None):
+    train_loader_kwargs_for_m_resnet = {
+        'drop_last': True,         # cfg.DATALOADER.DROP_LAST,
+        'naive_way': True,         # cfg.DATALOADER.NAIVE_WAY,
+        'delete_rem': False
+    }
+
+    meta_loader_kwargs_for_m_resnet = {
+        'drop_last': True,
+        'naive_way': False,
+        'delete_rem': False
+    }
+
+    train_loader, mtrain_loader, mtest_loader, num_domains = build_reid_train_loader(
+        dataset_names=['Market1501'],
+        num_workers=num_workers,
+        train_batch_size=batch_size,
+        train_num_instance=num_instance,
+        mtrain_batch_size=batch_size,
+        mtrain_num_instance=num_instance,
+        mtest_batch_size=batch_size,
+        mtest_num_instance=num_instance,
+        train_loader_kwargs=train_loader_kwargs_for_m_resnet,
+        meta_loader_kwargs=meta_loader_kwargs_for_m_resnet,
+        meta_loader_flag='diff',
+        meta_data_names='DG',
+        synth_flag=False,
+        camera_to_domain=True,
+        world_size=world_size,
+        seed=seed
+    )
+
+    return train_loader, mtrain_loader, mtest_loader, num_domains
+
+
+def build_test_loader_for_m_resnet(batch_size=128, num_workers=2):
+    test_loader_market = build_reid_test_loader('Market1501', batch_size, num_workers=num_workers, flag_test=True)
+    test_loader_duke = build_reid_test_loader('DukeMTMC', batch_size, num_workers=num_workers, flag_test=True)
+    return test_loader_market, test_loader_duke

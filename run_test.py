@@ -2,6 +2,9 @@ from test import *
 
 
 def run_test():
+    print('*'*100)
+    print('forward test starts.')
+    print('*'*100)
     forward_test()
     print('*'*100)
     print('forward test finished.')

@@ -63,7 +63,8 @@ class BalancedIdentitySampler(Sampler):
 
         #if seed is None:
         #    seed = comm.shared_random_seed()
-        self._seed = int(seed)
+        if seed != None:
+            self._seed = int(seed)
 
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
@@ -115,7 +116,8 @@ class BalancedIdentitySampler(Sampler):
         yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
 
     def _infinite_indices(self):
-        np.random.seed(self._seed)
+        if self._seed != None:
+            np.random.seed(self._seed)
         while True:
             indices = self._get_epoch_indices()
             yield from indices
@@ -154,7 +156,8 @@ class NaiveIdentitySampler(Sampler):
 
         #if seed is None:
         #    seed = comm.shared_random_seed()
-        self._seed = int(seed)
+        if seed != None:
+            self._seed = int(seed)
 
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
@@ -229,7 +232,8 @@ class NaiveIdentitySampler(Sampler):
         yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
 
     def _infinite_indices(self):
-        np.random.seed(self._seed)
+        if self._seed != None:
+            np.random.seed(self._seed)
         while True:
             indices = self._get_epoch_indices()
             yield from indices
@@ -272,7 +276,8 @@ class DomainSuffleSampler(Sampler):
 
         #if seed is None:
         #    seed = comm.shared_random_seed()
-        self._seed = int(seed)
+        if seed != None:
+            self._seed = int(seed)
 
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
@@ -378,7 +383,8 @@ class DomainSuffleSampler(Sampler):
         yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
 
     def _infinite_indices(self):
-        np.random.seed(self._seed)
+        if self._seed != None:
+            np.random.seed(self._seed)
         while True:
             indices = self._get_epoch_indices()
             yield from indices

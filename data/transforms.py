@@ -29,8 +29,6 @@ def build_transforms(is_train=True, is_fake=False):
     res = []
 
     if is_train:
-        size_train = (256, 128)     # cfg.INPUT.SIZE_TRAIN
-
         # horizontal filp
         do_flip = True  # cfg.INPUT.DO_FLIP
         flip_prob = 0.5 # cfg.INPUT.FLIP_PROB
@@ -77,10 +75,11 @@ def build_transforms(is_train=True, is_fake=False):
 
         """
         
+        size_train = (256, 128)     # cfg.INPUT.SIZE_TRAIN
 
         res.append(T.Resize(size_train, interpolation=3))
         if do_flip:
-            res.append(T.RandomHorizontalFlip(p=flip_prob))
+            res.append(T.RandomHorizontalFlip(prob=flip_prob))
         if do_pad:
             res.extend([T.Pad(padding, padding_mode=padding_mode),
                         T.RandomCrop(size_train)])
@@ -99,5 +98,5 @@ def build_transforms(is_train=True, is_fake=False):
     else:
         size_test = (256, 128) 
         res.append(T.Resize(size_test, interpolation=3))
-    res.append(T.to_tensor())  # 源码用的fastreid中的ToTensor()
+    res.append(T.to_tensor)  # 源码用的fastreid中的ToTensor()
     return T.Compose(res)
