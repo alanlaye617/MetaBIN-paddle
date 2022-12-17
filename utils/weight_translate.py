@@ -4,7 +4,7 @@ import paddle
 
 def weight_translate(torch_path, paddle_path):
     torch_state_dict = torch.load(torch_path)
-    fc_names = ["classifier"]
+    fc_names = ["classifier_fc"]
     in_names = 'ins_n'
     paddle_state_dict = {}
     for k in torch_state_dict:

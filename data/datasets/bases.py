@@ -218,7 +218,7 @@ class CommDataset(Dataset):
             "targets": pid,
             "camid": camid,
             "img_path": img_path,
-            "domain": domain
+            "domains": domain
         }
 
     @property

@@ -254,7 +254,7 @@ def build_train_loader_for_m_resnet(dataset_list=['Market1501'], batch_size=96, 
 
 
 def build_test_loader_for_m_resnet(batch_size=128, num_workers=2):
-    test_loader_market = build_reid_test_loader('Market1501', batch_size, num_workers=num_workers, flag_test=True)
-    test_loader_duke = build_reid_test_loader('DukeMTMC', batch_size, num_workers=num_workers, flag_test=True)
-    return test_loader_market, test_loader_duke
+    test_loader_market, num_query_market = build_reid_test_loader('Market1501', batch_size, num_workers=num_workers, flag_test=True)
+    test_loader_duke, num_query_duke = build_reid_test_loader('DukeMTMC', batch_size, num_workers=num_workers, flag_test=True)
+    return test_loader_market, num_query_market, test_loader_duke, num_query_duke
 

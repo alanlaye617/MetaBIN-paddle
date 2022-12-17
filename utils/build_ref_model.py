@@ -65,7 +65,7 @@ def setup(args):
         default_setup(cfg, args)
     return cfg
 
-def build_ref_model():
+def build_ref_model(num_classes):
     args = default_argument_parser().parse_args()
     args.config_file = './refs/configs/Sample/M-resnet.yml'
     args.eval_only = True
@@ -77,6 +77,8 @@ def build_ref_model():
     # Trainer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
     cfg.defrost()
     cfg.MODEL.BACKBONE.PRETRAIN = False
+    cfg.MODEL.HEADS.NUM_CLASSES = 4
+
     model = Trainer.build_model(cfg)
     return model
 

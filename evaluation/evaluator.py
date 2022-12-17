@@ -17,13 +17,10 @@ from tabulate import tabulate
 #from .evaluator import DatasetEvaluator
 from .rank import evaluate_rank
 
-logger = logging.getLogger(__name__)
-
 
 class ReidEvaluator(object):
-    def __init__(self, num_query, output_dir=None):
+    def __init__(self, num_query):
         self._num_query = num_query
-        self._output_dir = output_dir
 
         self.features = []
         self.pids = []
@@ -37,10 +34,10 @@ class ReidEvaluator(object):
     def process(self, inputs, outputs):
         self.pids.extend(inputs["targets"].numpy())
         self.camids.extend(inputs["camid"].numpy())
-        self.features.append(outputs.cpu())
+        self.features.append(outputs)
 
     @staticmethod
-    def cal_dist(metric: str, query_feat: paddle.tensor, gallery_feat: paddle.tensor):
+    def cal_dist(metric: str, query_feat: paddle.Tensor, gallery_feat: paddle.Tensor):
         assert metric in ["cosine", "euclidean"], "must choose from [cosine, euclidean], but got {}".format(metric)
         if metric == "cosine":
             query_feat = F.normalize(query_feat, dim=1)
@@ -52,8 +49,8 @@ class ReidEvaluator(object):
             yy = paddle.pow(gallery_feat, 2).sum(1, keepdim=True).expand(n, m).t()
             dist = xx + yy
             dist.addmm_(1, -2, query_feat, gallery_feat.t())
-            dist = dist.clamp(min=1e-12).sqrt()  # for numerical stability
-        return dist.cpu().numpy()
+            dist = dist.clip(min=1e-12).sqrt()  # for numerical stability
+        return dist.numpy()
 
     def evaluate(self, metric='cosine'):
         features = paddle.concat(self.features, dim=0)
@@ -70,9 +67,7 @@ class ReidEvaluator(object):
 
         self._results = OrderedDict()
 
-    
         dist = self.cal_dist(metric, query_features, gallery_features)
-
 
         cmc, all_AP, all_INP = evaluate_rank(dist, query_pids, gallery_pids, query_camids, gallery_camids)
         mAP = np.mean(all_AP)
