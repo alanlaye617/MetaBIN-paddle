@@ -38,12 +38,12 @@ def forward_test():
     for i in range(5):
         inputs = np.random.rand(16, 3, 256, 128)
 
-        inputs_ref = torch.tensor(inputs, dtype=torch.float32).cuda()
+        inputs_ref = torch.tensor(inputs, dtype=torch.float64).cuda()
         outputs_ref = model_ref(inputs_ref)
         reprod_log_ref.add("forwards_logits_%d"%(i), outputs_ref.cpu().detach().numpy())
         del outputs_ref, inputs_ref
 
-        inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float32)
+        inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float64)
         outputs_pad = model_pad(inputs_pad)
         reprod_log_pad.add("forwards_logits_%d"%(i), outputs_pad.detach().numpy())
         del outputs_pad, inputs_pad

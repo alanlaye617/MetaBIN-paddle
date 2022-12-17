@@ -1,28 +1,8 @@
 import paddle 
 from paddle import nn
 import paddle.vision.transforms as T
-
-class RandomApply(nn.Layer):
-    def __init__(self, transforms, p=0.5, name_scope=None, dtype="float32"):
-        super().__init__(name_scope, dtype)
-        self.transforms = transforms
-        self.p = p
-
-    def forward(self, img):
-        if self.p < paddle.rand(1):
-            return img
-        for t in self.transforms:
-            img = t(img)
-        return img
-    
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '('
-        format_string += '\n    p={}'.format(self.p)
-        for t in self.transforms:
-            format_string += '\n'
-            format_string += '    {0}'.format(t)
-        format_string += '\n)'
-        return format_string
+import random
+import numpy as np
 
 
 def build_transforms(is_train=True, is_fake=False):
@@ -76,15 +56,16 @@ def build_transforms(is_train=True, is_fake=False):
         """
         
         size_train = (256, 128)     # cfg.INPUT.SIZE_TRAIN
+        #res.append(T.Resize(size_train, interpolation=3))
 
-        res.append(T.Resize(size_train, interpolation=3))
+        res.append(T.Resize(size_train, interpolation='bicubic'))
         if do_flip:
             res.append(T.RandomHorizontalFlip(prob=flip_prob))
         if do_pad:
             res.extend([T.Pad(padding, padding_mode=padding_mode),
                         T.RandomCrop(size_train)])
         if do_cj:
-            res.append(RandomApply([T.ColorJitter(cj_brightness, cj_contrast, cj_saturation, cj_hue)], p=cj_prob))
+            res.append(T.ColorJitter(cj_brightness, cj_contrast, cj_saturation, cj_hue))
         """
         if is_fake:
             if cfg.META.DATA.SYNTH_FLAG == 'jitter':
@@ -97,6 +78,7 @@ def build_transforms(is_train=True, is_fake=False):
         """
     else:
         size_test = (256, 128) 
-        res.append(T.Resize(size_test, interpolation=3))
-    res.append(T.to_tensor)  # 源码用的fastreid中的ToTensor()
+        res.append(T.Resize(size_test, interpolation='bicubic'))
+    res.append(T.ToTensor())  # 源码用的fastreid中的ToTensor()
     return T.Compose(res)
+

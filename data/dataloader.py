@@ -1,10 +1,9 @@
 import paddle
 import paddle.io
 from .transforms import build_transforms
-from .datasets import DukeMTMC, Market1501
+from .datasets import DukeMTMC, Market1501, LiteData
 from .datasets import CommDataset
 import data.samplers as samplers
-
 
 
 def create_dataset(dataset_name, root='datasets'):
@@ -12,6 +11,8 @@ def create_dataset(dataset_name, root='datasets'):
         return Market1501(root=root)
     elif dataset_name == 'DukeMTMC':
         return DukeMTMC(root=root)
+    elif dataset_name =='LiteData':
+        return LiteData(root=root)
     else:
         raise KeyError('Unknown dataset:', dataset_name)
 
@@ -50,29 +51,23 @@ def fast_batch_collator(batched_inputs):
     """
     elem = batched_inputs[0]
     if isinstance(elem, paddle.Tensor):
-        out = paddle.zeros((len(batched_inputs), *elem.size()), dtype=elem.dtype)
+        out = paddle.zeros((len(batched_inputs), *elem.shape), dtype=elem.dtype)
         for i, tensor in enumerate(batched_inputs):
             out[i] += tensor
         return out
+    elif isinstance(elem, dict):
+        return {key: fast_batch_collator([d[key] for d in batched_inputs]) for key in elem}
+    elif isinstance(elem, float):
+        return paddle.to_tensor(batched_inputs, dtype=paddle.float64)
+    elif isinstance(elem, int):
+        return paddle.to_tensor(batched_inputs)
+    elif isinstance(elem, str):
+        return batched_inputs
     else:
         raise ValueError
-    """
-    elif isinstance(elem, container_abcs.Mapping):
-        return {key: fast_batch_collator([d[key] for d in batched_inputs]) for key in elem}
-
-    elif isinstance(elem, float):
-        return paddle.tensor(batched_inputs, dtype=paddle.float64)
-    elif isinstance(elem, int_classes):
-        return paddle.tensor(batched_inputs)
-    elif isinstance(elem, string_classes):
-        return batched_inputs    
-    """
 
 
-
-
-
-def build_reid_train_loader(dataset_names, num_workers,
+def build_reid_train_loader(dataset_list, num_workers,
                             train_batch_size, train_num_instance,
                             mtrain_batch_size, mtrain_num_instance,
                             mtest_batch_size, mtest_num_instance,
@@ -98,19 +93,19 @@ def build_reid_train_loader(dataset_names, num_workers,
     camera_all = list()
 
     # load datasets
-    for name in dataset_names:
+    for name in dataset_list:
         dataset = create_dataset(name)
         # dataset.train: (path, pid, camid, domain)
         if len(dataset.train[0]) < 4:
             for i, x in enumerate(dataset.train):
                 additional_info = {}
                 if camera_to_domain:
-                    additional_info['domains'] = dataset.train[i][2]
+                    domain = dataset.train[i][2]
                     camera_all.append(dataset.train[i][2])
                 else:
-                    additional_info['domains'] = int(domain_idx)
+                    domain = int(domain_idx)
                 dataset.train[i] = list(dataset.train[i])
-                dataset.train[i].append(additional_info)
+                dataset.train[i].append(domain)
                 dataset.train[i] = tuple(dataset.train[i])
         domain_idx += 1
         train_items.extend(dataset.train)
@@ -138,7 +133,6 @@ def build_reid_train_loader(dataset_names, num_workers,
         camera_to_domain=camera_to_domain,
         )
     
-
 
     train_loader_add = {}
     train_loader_add['mtrain'] = None # mtrain dataset
@@ -224,7 +218,7 @@ def build_reid_test_loader(dataset_name, batch_size, num_workers=2, flag_test=Tr
     return test_loader, len(dataset.query)
 
 
-def build_train_loader_for_m_resnet(batch_size=96, num_instance=4, num_workers=2, world_size=1, seed=None):
+def build_train_loader_for_m_resnet(dataset_list=['Market1501'], batch_size=96, num_instance=4, num_workers=2, world_size=1, seed=None):
     train_loader_kwargs_for_m_resnet = {
         'drop_last': True,         # cfg.DATALOADER.DROP_LAST,
         'naive_way': True,         # cfg.DATALOADER.NAIVE_WAY,
@@ -238,7 +232,7 @@ def build_train_loader_for_m_resnet(batch_size=96, num_instance=4, num_workers=2
     }
 
     train_loader, mtrain_loader, mtest_loader, num_domains = build_reid_train_loader(
-        dataset_names=['Market1501'],
+        dataset_list=dataset_list,
         num_workers=num_workers,
         train_batch_size=batch_size,
         train_num_instance=num_instance,
@@ -254,7 +248,7 @@ def build_train_loader_for_m_resnet(batch_size=96, num_instance=4, num_workers=2
         camera_to_domain=True,
         world_size=world_size,
         seed=seed
-    )
+    )   
 
     return train_loader, mtrain_loader, mtest_loader, num_domains
 
@@ -263,3 +257,4 @@ def build_test_loader_for_m_resnet(batch_size=128, num_workers=2):
     test_loader_market = build_reid_test_loader('Market1501', batch_size, num_workers=num_workers, flag_test=True)
     test_loader_duke = build_reid_test_loader('DukeMTMC', batch_size, num_workers=num_workers, flag_test=True)
     return test_loader_market, test_loader_duke
+

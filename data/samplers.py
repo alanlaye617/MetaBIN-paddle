@@ -53,7 +53,7 @@ class BalancedIdentitySampler(Sampler):
         for index, info in enumerate(data_source):
             pid = info[1]
             # camid = info[2]
-            camid = info[3]['domains']
+            camid = info[3]
             self.index_pid[index] = pid
             self.pid_cam[pid].append(camid)
             self.pid_index[pid].append(index)
@@ -65,7 +65,8 @@ class BalancedIdentitySampler(Sampler):
         #    seed = comm.shared_random_seed()
         if seed != None:
             self._seed = int(seed)
-
+        else:
+            self._seed = None
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
 
@@ -81,7 +82,7 @@ class BalancedIdentitySampler(Sampler):
         ret = []
         for kid in identities:
             i = np.random.choice(self.pid_index[self.pids[kid]])
-            i_cam = self.data_source[i][3]['domains']
+            i_cam = self.data_source[i][3]
             # _, i_pid, i_cam = self.data_source[i]
             ret.append(i)
             pid_i = self.index_pid[i]
@@ -112,8 +113,9 @@ class BalancedIdentitySampler(Sampler):
         return ret
 
     def __iter__(self):
-        start = self._rank
-        yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        # start = self._rank
+        # yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        yield from itertools.islice(self._infinite_indices(), 0, None, 1)
 
     def _infinite_indices(self):
         if self._seed != None:
@@ -158,7 +160,8 @@ class NaiveIdentitySampler(Sampler):
         #    seed = comm.shared_random_seed()
         if seed != None:
             self._seed = int(seed)
-
+        else:
+            self._seed = None
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
 
@@ -228,8 +231,10 @@ class NaiveIdentitySampler(Sampler):
         return final_idxs
 
     def __iter__(self):
-        start = self._rank
-        yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        #start = self._rank
+        #yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        yield from itertools.islice(self._infinite_indices(), 0, None, 1)
+
 
     def _infinite_indices(self):
         if self._seed != None:
@@ -255,7 +260,7 @@ class DomainSuffleSampler(Sampler):
 
         for index, info in enumerate(data_source):
 
-            domainid = info[3]['domains']
+            domainid = info[3]
             if camera_to_domain:
                 pid = info[1] + str(domainid)
             else:
@@ -278,7 +283,8 @@ class DomainSuffleSampler(Sampler):
         #    seed = comm.shared_random_seed()
         if seed != None:
             self._seed = int(seed)
-
+        else:
+            self._seed = None
         #self._rank = comm.get_rank()
         #self._world_size = comm.get_world_size()
 
@@ -379,8 +385,9 @@ class DomainSuffleSampler(Sampler):
         return final_idxs
 
     def __iter__(self):
-        start = self._rank
-        yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        # self._rank
+        # yield from itertools.islice(self._infinite_indices(), start, None, self._world_size)
+        yield from itertools.islice(self._infinite_indices(), 0, None, 1)
 
     def _infinite_indices(self):
         if self._seed != None:

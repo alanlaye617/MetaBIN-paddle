@@ -8,45 +8,8 @@ import copy
 import logging
 import os
 from paddle.io import Dataset
-import numpy as np
-from PIL import Image, ImageOps
 
-def read_image(file_name, format=None):
-    """
-    Read an image into the given format.
-    Will apply rotation and flipping if the image has such exif information.
-    Args:
-        file_name (str): image file path
-        format (str): one of the supported image modes in PIL, or "BGR"
-    Returns:
-        image (np.ndarray): an HWC image
-    """
-    #with PathManager.open(file_name, "rb") as f:
-    with open(file_name, "rb") as f:
-        image = Image.open(f)
-
-        # capture and ignore this bug: https://github.com/python-pillow/Pillow/issues/3973
-        try:
-            image = ImageOps.exif_transpose(image)
-        except Exception:
-            pass
-
-        if format is not None:
-            # PIL only supports RGB, so convert to RGB and flip channels over below
-            conversion_format = format
-            if format == "BGR":
-                conversion_format = "RGB"
-            image = image.convert(conversion_format)
-        image = np.asarray(image)
-        if format == "BGR":
-            # flip channels if needed
-            image = image[:, :, ::-1]
-        # PIL squeezes out the channel dimension for "L", so make it HWC
-        if format == "L":
-            image = np.expand_dims(image, -1)
-        image = Image.fromarray(image)
-        return image
-
+from .utils import read_image
 
 class Dataset(object):
     """An abstract class representing a Dataset.
@@ -243,10 +206,10 @@ class CommDataset(Dataset):
 
     def __getitem__(self, index):
         if len(self.img_items[index]) > 3:
-            img_path, pid, camid, others = self.img_items[index]
+            img_path, pid, camid, domain = self.img_items[index]
         else:
             img_path, pid, camid = self.img_items[index]
-            others = ''
+            domain = ''
         img = read_image(img_path)
         if self.transform is not None: img = self.transform(img)
         if self.relabel: pid = self.pid_dict[pid]
@@ -255,7 +218,7 @@ class CommDataset(Dataset):
             "targets": pid,
             "camid": camid,
             "img_path": img_path,
-            "others": others
+            "domain": domain
         }
 
     @property
