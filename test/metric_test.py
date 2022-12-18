@@ -5,11 +5,12 @@ import torch
 import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
-
-from utils import translate_weight, build_ref_model
+import sys
+sys.path.append('.')
+from utils import translate_weight, build_ref_model, build_ref_evaluator, translate_inputs
 from modeling import build_resnet_backbone, Metalearning
 from data import build_reid_test_loader
-
+from evaluation import ReidEvaluator
 
 def metric_test():
     paddle.device.set_device('gpu:0')
@@ -24,7 +25,7 @@ def metric_test():
     torch_path = "./model_weights/model.pth"
     paddle_path = "./model_weights/model.pdparams"
 
-    model_ref = build_ref_trainer(4).cuda()
+    model_ref = build_ref_model(4).cuda()
 #    model_ref = build_ref_model().backbone.cuda()
     torch.save(model_ref.state_dict(), torch_path)
     model_ref.eval()
@@ -36,18 +37,30 @@ def metric_test():
     model_pad.set_state_dict(paddle.load(paddle_path))
     model_pad.eval()
 
-    test_loader_lite, num_query_lite= build_reid_test_loader('LiteData', 20, num_workers=0)
-    inputs = next(test_loader_lite.__iter__())
+    test_loader, num_query= build_reid_test_loader('LiteData', 20, num_workers=0)
+    inputs = next(test_loader.__iter__())
 
-    inputs_ref = torch.tensor(inputs, dtype=torch.float32).cuda()
+    inputs_ref = translate_inputs(inputs, if_train=False)
     outputs_ref = model_ref(inputs_ref)
-    reprod_log_ref.add("metric", outputs_ref.cpu().detach().numpy())
-    del outputs_ref, inputs_ref
-
+    evaluator_ref = build_ref_evaluator(num_query)
+    evaluator_ref.process(inputs_ref, outputs_ref.cpu().detach())
+    metric_ref = evaluator_ref.evaluate()
+    reprod_log_ref.add("Rank-1", np.array([metric_ref['Rank-1']]))
+    reprod_log_ref.add("Rank-5", np.array([metric_ref['Rank-5']]))
+    reprod_log_ref.add("Rank-10", np.array([metric_ref['Rank-10']]))
+    reprod_log_ref.add("mAP", np.array([metric_ref['mAP']]))
+    reprod_log_ref.add("mINP", np.array([metric_ref['mINP']]))
+    
+    evaluator_pad = ReidEvaluator(num_query)
     inputs_pad = inputs
     outputs_pad = model_pad(inputs_pad)
-    reprod_log_pad.add("metric", outputs_pad.detach().numpy())
-    del outputs_pad, inputs_pad
+    evaluator_pad.process(inputs_pad, outputs_pad.cpu().detach())
+    metric_pad = evaluator_pad.evaluate()
+    reprod_log_pad.add("Rank-1", np.array([metric_pad['Rank-1']]))
+    reprod_log_pad.add("Rank-5", np.array([metric_pad['Rank-5']]))
+    reprod_log_pad.add("Rank-10", np.array([metric_pad['Rank-10']]))
+    reprod_log_pad.add("mAP",  np.array([metric_pad['mAP']]))
+    reprod_log_pad.add("mINP",  np.array([metric_pad['mINP']]))
 
     reprod_log_ref.save('./result/metric_ref.npy')
     reprod_log_pad.save('./result/metric_paddle.npy')

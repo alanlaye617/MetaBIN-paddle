@@ -40,20 +40,20 @@ class ReidEvaluator(object):
     def cal_dist(metric: str, query_feat: paddle.Tensor, gallery_feat: paddle.Tensor):
         assert metric in ["cosine", "euclidean"], "must choose from [cosine, euclidean], but got {}".format(metric)
         if metric == "cosine":
-            query_feat = F.normalize(query_feat, dim=1)
-            gallery_feat = F.normalize(gallery_feat, dim=1)
+            query_feat = F.normalize(query_feat, axis=1)
+            gallery_feat = F.normalize(gallery_feat, axis=1)
             dist = 1 - paddle.mm(query_feat, gallery_feat.t())
         else:
             m, n = query_feat.size(0), gallery_feat.size(0)
-            xx = paddle.pow(query_feat, 2).sum(1, keepdim=True).expand(m, n)
-            yy = paddle.pow(gallery_feat, 2).sum(1, keepdim=True).expand(n, m).t()
+            xx = paddle.pow(query_feat, 2).sum(1, keepdim=True).expand([m, n])
+            yy = paddle.pow(gallery_feat, 2).sum(1, keepdim=True).expand([n, m]).t()
             dist = xx + yy
             dist.addmm_(1, -2, query_feat, gallery_feat.t())
             dist = dist.clip(min=1e-12).sqrt()  # for numerical stability
         return dist.numpy()
 
     def evaluate(self, metric='cosine'):
-        features = paddle.concat(self.features, dim=0)
+        features = paddle.concat(self.features, axis=0)
 
         # query feature, person ids and camera ids
         query_features = features[:self._num_query]

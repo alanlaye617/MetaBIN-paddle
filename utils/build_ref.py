@@ -11,7 +11,7 @@ import sys
 import re
 
 sys.path.append('./refs')
-
+from refs.fastreid.evaluation import ReidEvaluator
 from refs.fastreid.config import get_cfg
 from refs.fastreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch
 from refs.fastreid.utils.checkpoint import Checkpointer
@@ -96,4 +96,13 @@ def build_ref_model(num_classes):
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
     print("Command Line Args:", args)    
     return Trainer.build_model(cfg)
+
+def build_ref_evaluator(num_query):
+    args = default_argument_parser().parse_args()
+    args.config_file = './refs/configs/Sample/M-resnet.yml'
+    args.eval_only = True
+    args.resume = True
+    cfg = setup(args)
+    cfg.defrost()
+    return ReidEvaluator(cfg, num_query)
 

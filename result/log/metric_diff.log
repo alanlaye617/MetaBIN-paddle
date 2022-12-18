@@ -1,0 +1,11 @@
+[2022/12/18 22:31:50] root INFO: Rank-1: 
+[2022/12/18 22:31:50] root INFO: 	mean diff: check passed: True, value: 0.0
+[2022/12/18 22:31:50] root INFO: Rank-5: 
+[2022/12/18 22:31:50] root INFO: 	mean diff: check passed: True, value: 0.0
+[2022/12/18 22:31:50] root INFO: Rank-10: 
+[2022/12/18 22:31:50] root INFO: 	mean diff: check passed: True, value: 0.0
+[2022/12/18 22:31:50] root INFO: mAP: 
+[2022/12/18 22:31:50] root INFO: 	mean diff: check passed: True, value: 0.0
+[2022/12/18 22:31:50] root INFO: mINP: 
+[2022/12/18 22:31:50] root INFO: 	mean diff: check passed: True, value: 0.0
+[2022/12/18 22:31:50] root INFO: diff check passed

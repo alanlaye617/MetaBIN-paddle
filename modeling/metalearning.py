@@ -67,9 +67,13 @@ class Metalearning(nn.Layer):
 
 
         if "CrossEntropyLoss" in loss_names:
-            one_hot_labels = F.one_hot(gt_labels, num_classes=self.num_classes)
-            smooth_labels = F.label_smooth(one_hot_labels)
-            loss_dict['loss_cls'] = nn.CrossEntropyLoss(soft_label=True)(cls_outputs, smooth_labels)*1.0
+                loss_dict['loss_cls'] = cross_entropy_loss(
+                cls_outputs,
+                gt_labels,
+                eps=0.1,
+                alpha=0.2,
+            ) * 1.0
+
 
 
         if "TripletLoss" in loss_names:
