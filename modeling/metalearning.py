@@ -15,6 +15,7 @@ class Metalearning(nn.Layer):
         self.backbone = build_resnet_backbone() # resnet-50
         self.heads = MetalearningHead(num_classes)
         self.num_classes = num_classes
+        self.init_lr()
 
     def forward(self, batched_inputs, opt=None):
         if self.training:
@@ -47,7 +48,6 @@ class Metalearning(nn.Layer):
         images = (images - self.pixel_mean)/self.pixel_std
         #images.sub_(self.pixel_mean).div_(self.pixel_std)
         return images
-
 
     def losses(self, outs, opt = None):
         outputs           = outs["outputs"]
@@ -90,5 +90,21 @@ class Metalearning(nn.Layer):
                 neg_flag=[0, 1, 1],
             ) * 1.0
         return loss_dict
+
+    def init_lr(self):    
+        for key, value in self.named_parameters():
+                    # print(key)
+            if isinstance(value, list):
+                print('.')
+            if value.stop_gradient:
+                continue
+            if "backbone" in key:
+                value.optimize_attr['learning_rate'] *= 1.0       # cfg.SOLVER.BACKBONE_LR_FACTOR
+            if "heads" in key:
+                value.optimize_attr['learning_rate'] *= 1.0       # cfg.SOLVER.HEADS_LR_FACTOR
+            if "bias" in key:
+                value.optimize_attr['learning_rate'] *= 2.0       # cfg.SOLVER.BIAS_LR_FACTOR
+            if "gate" in key:
+                value.optimize_attr['learning_rate'] *= 20.0      # cfg.META.SOLVER.LR_FACTOR.GATE
 
 

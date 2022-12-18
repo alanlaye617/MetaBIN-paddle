@@ -3,7 +3,9 @@ refs/logs/Sample/M-resnet/event*
 !refs/reference
 datasets/DukeMTMC-reID
 datasets/Market-1501-v15.09.15
-test.py
+test*
+*.pth
+*.pdparams
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

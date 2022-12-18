@@ -14,10 +14,8 @@ sys.path.append('./refs')
 from refs.fastreid.evaluation import ReidEvaluator
 from refs.fastreid.config import get_cfg
 from refs.fastreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch
-from refs.fastreid.utils.checkpoint import Checkpointer
-from refs.fastreid.engine import hooks
 from refs.fastreid.evaluation import ReidEvaluator
-from refs.fastreid.utils.file_io import PathManager
+from refs.fastreid.solver import build_lr_scheduler, build_optimizer
 import torch
 import numpy as np
 import random
@@ -65,13 +63,16 @@ def setup(args):
         default_setup(cfg, args)
     return cfg
 
-def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
+def get_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True, resume=True):
     args = default_argument_parser().parse_args()
-    args.config_file = './refs/configs/Sample/M-resnet.yml'
-    args.eval_only = True
-    args.resume = True
+    args.config_file = config_file
+    args.eval_only = eval_only
+    args.resume = resume
     cfg = setup(args)
-    print("Command Line Args:", args)
+    return cfg
+
+def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
+    cfg = get_cfg()
 
     # cfg.MODEL.WEIGHTS = "./logs/Visualize/u01/model_final.pth"
     # Trainer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
@@ -87,22 +88,13 @@ def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], tes
     return trainer
 
 def build_ref_model(num_classes):
-    args = default_argument_parser().parse_args()
-    args.config_file = './refs/configs/Sample/M-resnet.yml'
-    args.eval_only = True
-    args.resume = True
-    cfg = setup(args)
+    cfg = get_cfg()
     cfg.defrost()
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
-    print("Command Line Args:", args)    
     return Trainer.build_model(cfg)
 
 def build_ref_evaluator(num_query):
-    args = default_argument_parser().parse_args()
-    args.config_file = './refs/configs/Sample/M-resnet.yml'
-    args.eval_only = True
-    args.resume = True
-    cfg = setup(args)
+    cfg = get_cfg()
     cfg.defrost()
     return ReidEvaluator(cfg, num_query)
 
