@@ -47,27 +47,27 @@ def backward_test():
         )
 
     optimizer_pad = build_optimizer(model=model_pad, lr_scheduler=scheduler_pad, momentum=0.9, flag='main')
-    for i in range(3):
+    for i in range(2):
         inputs_ref = next(train_loader.__iter__())
-        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
-        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
+        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
+        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 
         reprod_log_ref.add("CEloss_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
         reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
 
-        losses_ref['loss_triplet'].backward()
+        losses_ref['loss_cls'].backward()
         optimizer_ref.step()
         optimizer_ref.zero_grad()
         scheduler_ref.step()
 
         inputs_pad = translate_inputs_t2p(inputs_ref)
-        outputs_pad = model_pad(inputs_pad, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
-        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
+        outputs_pad = model_pad(inputs_pad, {'param_update': False,  'type_running_stats': 'general', 'each_domain': False})
+        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 
         reprod_log_pad.add("CEloss_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
         reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
 
-        losses_pad['loss_triplet'].backward()
+        losses_pad['loss_cls'].backward()
         optimizer_pad.step()
         optimizer_pad.clear_grad()
         scheduler_pad.step()

@@ -31,7 +31,7 @@ def build_optimizer(model, lr_scheduler, momentum, flag = None):
                     "weight_decay": weight_decay, 
                     "freeze": False
                     }]
-            """
+            
             else:
                 params += [{
                     "learning_rate": 0,
@@ -40,7 +40,7 @@ def build_optimizer(model, lr_scheduler, momentum, flag = None):
                     "weight_decay": weight_decay, 
                     "freeze": False
                     }]
-            """
+            
         elif flag == 'norm':
             if "gate" in key:
                 params += [{
@@ -50,7 +50,7 @@ def build_optimizer(model, lr_scheduler, momentum, flag = None):
                     "weight_decay": 0.0,
                     "freeze": False
                     }]
-            """
+            
             else:
                 params += [{
                     "learning_rate": 0,
@@ -59,7 +59,7 @@ def build_optimizer(model, lr_scheduler, momentum, flag = None):
                     "weight_decay": 0.0,
                     "freeze": False
                     }]                
-            """
+            
     name2optimier = {
         'Momentum': optimizer.Momentum,
     }
