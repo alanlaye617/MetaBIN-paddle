@@ -5,25 +5,24 @@
 """
 import paddle
 import paddle.nn.functional as F
-
-
-
-
+from paddle import nn
+nn.CrossEntropyLoss
+paddle.scatter
 def cross_entropy_loss(pred_class_logits, gt_classes, eps, alpha=0.2):
-    num_classes = pred_class_logits.size(1)
+    num_classes = pred_class_logits.shape[1]
 
     if eps >= 0:
         smooth_param = eps
     else:
         # Adaptive label smooth regularization
-        soft_label = F.softmax(pred_class_logits, dim=1)
-        smooth_param = alpha * soft_label[paddle.arange(soft_label.size(0)), gt_classes].unsqueeze(1)
-
-    log_probs = F.log_softmax(pred_class_logits, dim=1)
+        soft_label = F.softmax(pred_class_logits, axis=1)
+        smooth_param = alpha * soft_label[paddle.arange(soft_label.shape[0]), gt_classes].unsqueeze(1)
+    log_probs = F.log_softmax(pred_class_logits, axis=1)
     with paddle.no_grad():
         targets = paddle.ones_like(log_probs)
         targets *= smooth_param / (num_classes - 1)
-        targets.scatter_(1, gt_classes.data.unsqueeze(1), (1 - smooth_param))
+
+        targets.scatter_(gt_classes.unsqueeze(1), paddle.ones_like(targets)*(1 - smooth_param))
 
     loss = (-targets * log_probs).sum(dim=1)
 
@@ -36,7 +35,7 @@ def cross_entropy_loss(pred_class_logits, gt_classes, eps, alpha=0.2):
     """
 
     with paddle.no_grad():
-        non_zero_cnt = max(loss.nonzero(as_tuple=False).size(0), 1)
+        non_zero_cnt = max(loss.nonzero(as_tuple=False).shape[0], 1)
 
     loss = loss.sum() / non_zero_cnt
 

@@ -23,7 +23,7 @@ class MetalearningHead(nn.Layer):
         self.pool_layer = nn.AdaptiveAvgPool2D(1)
         in_feat = 2048
        # self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt, bias_freeze=True)
-        self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt)
+        self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt, bias_freeze=True)
 
         num_classes = num_classes
         # cls_type = linear
@@ -31,7 +31,7 @@ class MetalearningHead(nn.Layer):
 
     def forward(self, features, targets=None, opt=None):
         global_feat = self.pool_layer(features)
-        bn_feat = self.classifier_norm(features)
+        bn_feat = self.classifier_norm(global_feat, opt)
         if len(bn_feat.shape) == 4:
             bn_feat = bn_feat[..., 0, 0]
         if not self.training: return bn_feat

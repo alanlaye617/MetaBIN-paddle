@@ -23,7 +23,7 @@ class LiteData(ImageDataset):
     _junk_pids = [0, -1]
     dataset_dir = ''
     dataset_url = 'http://188.138.127.15:81/Datasets/Market-1501-v15.09.15.zip'
-    dataset_name = "market1501"
+    dataset_name = "LiteData"
 
     def __init__(self, root='datasets', market1501_500k=False, **kwargs):
         # self.root = osp.abspath(osp.expanduser(root))

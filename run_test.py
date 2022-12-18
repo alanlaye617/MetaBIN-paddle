@@ -1,6 +1,5 @@
 from test import *
 
-
 def run_test():
     print('*'*100)
     print('forward test starts.')
@@ -12,4 +11,5 @@ def run_test():
 
 
 if __name__ == '__main__':
-    run_test()
+    loss_test()
+   # run_test()

@@ -7,9 +7,9 @@ import torch
 import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
-
-from utils.weight_translate import weight_translate
-from utils.build_ref_model import build_ref_model
+sys.path.append('.')
+from utils import translate_weight
+from utils.build_ref_trainer import build_ref_trainer
 from modeling import build_resnet_backbone
 
 def forward_test():
@@ -22,14 +22,14 @@ def forward_test():
     reprod_log_ref = ReprodLogger()
     reprod_log_pad = ReprodLogger()
 
-    torch_path = "./data/backbone.pth"
-    paddle_path = "./data/backbone.pdparams"
+    torch_path = "./model_weights/backbone.pth"
+    paddle_path = "./model_weights/backbone.pdparams"
 
-    model_ref = build_ref_model().backbone.cuda()
+    model_ref = build_ref_trainer(4, batch_size=6).model.backbone.cuda()
     torch.save(model_ref.state_dict(), torch_path)
     model_ref.eval()
 
-    weight_translate(torch_path, paddle_path)
+    translate_weight(torch_path, paddle_path)
 
     model_pad = build_resnet_backbone()
     model_pad.set_state_dict(paddle.load(paddle_path))
@@ -38,12 +38,12 @@ def forward_test():
     for i in range(5):
         inputs = np.random.rand(16, 3, 256, 128)
 
-        inputs_ref = torch.tensor(inputs, dtype=torch.float64).cuda()
+        inputs_ref = torch.tensor(inputs, dtype=torch.float32).cuda()
         outputs_ref = model_ref(inputs_ref)
         reprod_log_ref.add("forwards_logits_%d"%(i), outputs_ref.cpu().detach().numpy())
         del outputs_ref, inputs_ref
 
-        inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float64)
+        inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float32)
         outputs_pad = model_pad(inputs_pad)
         reprod_log_pad.add("forwards_logits_%d"%(i), outputs_pad.detach().numpy())
         del outputs_pad, inputs_pad

@@ -151,8 +151,8 @@ class Meta_bin_gate_ver2(nn.Layer):
         else:
             update_gate = self.gate
         update_gate = update_gate.unsqueeze([0, -1, -1])
-        out_bn = self.bat_n(inputs)#, opt)
-        out_in = self.ins_n(inputs)#, opt)
+        out_bn = self.bat_n(inputs, opt)
+        out_in = self.ins_n(inputs, opt)
         out = out_bn * update_gate + out_in * (1-update_gate)
         return out
 
@@ -177,50 +177,7 @@ class Meta_bn_norm(nn.BatchNorm2D):
         self.weight.stop_gradient = weight_freeze
         self.bias.stop_gradient = bias_freeze
 
-
-class Meta_in_norm(nn.InstanceNorm2D):
-    def __init__(self, num_features, norm_opt, epsilon=0.00001, momentum=0.9, 
-                weight_freeze = False, bias_freeze = False, weight_init = 1.0, bias_init = 0.0,
-                data_format="NCHW", name=None):
-        if not weight_freeze:
-            weight_freeze = norm_opt['IN_W_FREEZE']
-        if not bias_freeze:
-            bias_freeze = norm_opt['IN_B_FREEZE']
-        lr = (0.0 if norm_opt['IN_AFFINE'] else 1.0)
-        use_global_stats = norm_opt['IN_RUNNING']
-        weight_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(weight_init) if weight_init is not None else None), 
-            learning_rate=lr)
-        bias_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(bias_init) if bias_init is not None else None), 
-            learning_rate=lr)
-        super().__init__(num_features, epsilon, momentum, weight_attr, bias_attr, data_format, name)
-        self.in_fc_multiply = norm_opt['IN_FC_MULTIPLY']
-    
-
-"""
-TODO
-class Meta_bn_norm(nn.BatchNorm2d):
-    def __init__(self, num_features, norm_opt = None, eps=1e-05,
-                 momentum=0.1, weight_freeze = False, 
-                 weight_init = 1.0, bias_init = 0.0):
-
-        if not weight_freeze:
-            weight_freeze = norm_opt['BN_W_FREEZE']
-        if not bias_freeze:
-            bias_freeze = norm_opt['BN_B_FREEZE']
-
-        affine = True if norm_opt['BN_AFFINE'] else False
-        track_running_stats = True if norm_opt['BN_RUNNING'] else False
-        super().__init__(num_features, eps, momentum, affine, track_running_stats)
-
-        if weight_init is not None: self.weight.data.fill_(weight_init)
-        if bias_init is not None: self.bias.data.fill_(bias_init)
-        self.weight.requires_grad_(not weight_freeze)
-        self.bias.requires_grad_(not bias_freeze)
-
-
-    def forward(self, inputs, opt = None):
+    def forward(self, inputs, opt=None):
         if inputs.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)'.format(inputs.dim()))
         if opt != None:
@@ -261,79 +218,79 @@ class Meta_bn_norm(nn.BatchNorm2d):
 
         if compute_each_batch:
             domain_idx = opt['domains']
-            unique_domain_idx = [int(x) for x in torch.unique(domain_idx).cpu()]
+            unique_domain_idx = [int(x) for x in paddle.unique(domain_idx)]
             cnt = 0
             for j in unique_domain_idx:
                 t_logical_domain = domain_idx == j
 
                 if norm_type == "general":  # update, but not apply running_mean/var
-                    result_local = F.batch_norm(inputs[t_logical_domain], self.running_mean, self.running_var,
+                    result_local = F.batch_norm()
+                    result_local = F.batch_norm(inputs[t_logical_domain], self._mean, self._variance,
                                           updated_weight, updated_bias,
-                                          self.training, self.momentum, self.eps)
+                                          self.training, self._momentum, self._epsilon)
                 elif norm_type == "hold":  # not update, not apply running_mean/var
                     result_local = F.batch_norm(inputs[t_logical_domain], None, None,
                                           updated_weight, updated_bias,
-                                          self.training, self.momentum, self.eps)
+                                          self.training, self._momentum, self._epsilon)
                 elif norm_type == "eval":  # fix and apply running_mean/var,
                     if self.running_mean is None:
                         result_local = F.batch_norm(inputs[t_logical_domain], None, None,
                                               updated_weight, updated_bias,
-                                              True, self.momentum, self.eps)
+                                              True, self._momentum, self._epsilon)
                     else:
-                        result_local = F.batch_norm(inputs[t_logical_domain], self.running_mean, self.running_var,
+                        result_local = F.batch_norm(inputs[t_logical_domain], self._mean, self._variance,
                                               updated_weight, updated_bias,
-                                              False, self.momentum, self.eps)
+                                              False, self._momentum, self._epsilon)
 
                 if cnt == 0:
                     result = copy.copy(result_local)
                 else:
-                    result = paddle.cat((result, result_local), 0)
+                    result = paddle.concat((result, result_local), 0)
                 cnt += 1
 
         else:
             if norm_type == "general": # update, but not apply running_mean/var
-                result = F.batch_norm(inputs, self.running_mean, self.running_var,
+                result = F.batch_norm(inputs, self._mean, self._variance,
                                       updated_weight, updated_bias,
-                                      self.training, self.momentum, self.eps)
+                                      self.training, self._momentum, self._epsilon)
             elif norm_type == "hold": # not update, not apply running_mean/var
                 result = F.batch_norm(inputs, None, None,
                                       updated_weight, updated_bias,
-                                      self.training, self.momentum, self.eps)
+                                      self.training, self._momentum, self._epsilon)
             elif norm_type == "eval": # fix and apply running_mean/var,
-                if self.running_mean is None:
+                if self._mean is None:
                     result = F.batch_norm(inputs, None, None,
                                           updated_weight, updated_bias,
-                                          True, self.momentum, self.eps)
+                                          True, self._momentum, self._epsilon)
                 else:
-                    result = F.batch_norm(inputs, self.running_mean, self.running_var,
+                    result = F.batch_norm(inputs, self._mean, self._variance,
                                           updated_weight, updated_bias,
-                                          False, self.momentum, self.eps)
+                                          False, self._momentum, self._epsilon)
         return result
 
-
 class Meta_in_norm(nn.InstanceNorm2D):
-    def __init__(self, num_features, epsilon=0.00001, momentum=0.9, weight_attr=None, bias_attr=None, data_format="NCHW", name=None):
-        super().__init__(num_features, epsilon, momentum, weight_attr, bias_attr, data_format, name)
-    def __init__(self, num_features, norm_opt = None, eps=1e-05,
-                 momentum=0.1, weight_freeze = False, bias_freeze = False,
-                 weight_init = 1.0, bias_init = 0.0):
-
+    def __init__(self, num_features, norm_opt, epsilon=0.00001, momentum=0.9, 
+                weight_freeze = False, bias_freeze = False, weight_init = 1.0, bias_init = 0.0,
+                data_format="NCHW", name=None):
         if not weight_freeze:
             weight_freeze = norm_opt['IN_W_FREEZE']
         if not bias_freeze:
             bias_freeze = norm_opt['IN_B_FREEZE']
-
-        affine = True if norm_opt['IN_AFFINE'] else False
-        track_running_stats = True if norm_opt['IN_RUNNING'] else False
-        super().__init__(num_features, eps, momentum, affine, track_running_stats)
-
-        if self.weight is not None:
-            if weight_init is not None: self.weight.data.fill_(weight_init)
-            self.weight.requires_grad_(not weight_freeze)
-        if self.bias is not None:
-            if bias_init is not None: self.bias.data.fill_(bias_init)
-            self.bias.requires_grad_(not bias_freeze)
+        self.affine = norm_opt['IN_AFFINE']
+        lr = (0.0 if norm_opt['IN_AFFINE'] else 1.0)
+        use_global_stats = norm_opt['IN_RUNNING']
+        weight_attr = paddle.ParamAttr(
+            initializer=(nn.initializer.Constant(weight_init) if weight_init is not None else None), 
+            learning_rate=lr)
+        bias_attr = paddle.ParamAttr(
+            initializer=(nn.initializer.Constant(bias_init) if bias_init is not None else None), 
+            learning_rate=lr)
+        self._mean = None
+        self._variance = None
+        super().__init__(num_features, epsilon, momentum, weight_attr, bias_attr, data_format, name)
         self.in_fc_multiply = norm_opt['IN_FC_MULTIPLY']
+        self._momentum = momentum
+
 
     def forward(self, inputs, opt = None):
         if inputs.dim() != 4:
@@ -346,7 +303,7 @@ class Meta_in_norm(nn.InstanceNorm2D):
             if opt != None:
                 use_meta_learning = False
                 if opt['param_update']:
-                    if self.weight is not None:
+                    if self.scale is not None:
                         if self.compute_meta_params:
                             use_meta_learning = True
             else:
@@ -359,30 +316,29 @@ class Meta_in_norm(nn.InstanceNorm2D):
 
             if use_meta_learning and self.affine:
                 # if opt['zero_grad']: self.zero_grad()
-                updated_weight = update_parameter(self.weight, self.w_step_size, opt)
+                updated_weight = update_parameter(self.scale, self.w_step_size, opt)
                 updated_bias = update_parameter(self.bias, self.b_step_size, opt)
                 # print('meta_bn is computed')
             else:
-                updated_weight = self.weight
+                updated_weight = self.scale
                 updated_bias = self.bias
 
 
             if norm_type == "general":
-                return F.instance_norm(inputs, self.running_mean, self.running_var,
+                return F.instance_norm(inputs, self._mean, self._variance,
                                        updated_weight, updated_bias,
-                                       self.training, self.momentum, self.eps)
+                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "hold":
                 return F.instance_norm(inputs, None, None,
                                        updated_weight, updated_bias,
-                                       self.training, self.momentum, self.eps)
+                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "eval":
-                if self.running_mean is None:
+                if self._mean is None:
                     return F.instance_norm(inputs, None, None,
                                            updated_weight, updated_bias,
-                                           True, self.momentum, self.eps)
+                                           True, self._momentum, self._epsilon)
                 else:
-                    return F.instance_norm(inputs, self.running_mean, self.running_var,
+                    return F.instance_norm(inputs, self._mean, self._variance,
                                            updated_weight, updated_bias,
-                                           False, self.momentum, self.eps)
-
-"""
+                                           False, self._momentum, self._epsilon)    
+    

@@ -36,8 +36,8 @@ def hard_example_mining(dist_mat, is_pos, is_neg):
       thus we can cope with all anchors in parallel.
     """
 
-    assert len(dist_mat.size()) == 2
-    N = dist_mat.size(0)
+    assert len(dist_mat.shape) == 2
+    N = dist_mat.shape[0]
 
     # `dist_ap` means distance(anchor, positive)
     # both `dist_ap` and `relative_p_inds` with shape [N, 1]
@@ -121,17 +121,17 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
     elif dist_type == 'cosine':
         dist_mat = cosine_dist(all_embedding, all_embedding)
 
-    N = dist_mat.size(0)
+    N = dist_mat.shape[0]
     if (pos_flag == [1,0,0] and neg_flag == [0,1,1]) or domain_labels == None:
-        is_pos = all_targets.view(N, 1).expand(N, N).eq(all_targets.view(N, 1).expand(N, N).t())
-        is_neg = all_targets.view(N, 1).expand(N, N).ne(all_targets.view(N, 1).expand(N, N).t())
+        is_pos = all_targets.reshape([N, 1]).expand([N, N]).equal(all_targets.reshape([N, 1]).expand([N, N]).t())
+        is_neg = all_targets.reshape([N, 1]).expand([N, N]).not_equal(all_targets.reshape([N, 1]).expand([N, N]).t())
     else:
         vec1 = copy.deepcopy(all_targets)
         for i in range(N):
             vec1[i] = i # [0,1,2,3,4,~~]
-        is_same_img = vec1.expand(N, N).eq(vec1.expand(N, N).t())
-        is_same_instance = all_targets.view(N, 1).expand(N, N).eq(all_targets.view(N, 1).expand(N, N).t())
-        is_same_domain = domain_labels.view(N, 1).expand(N, N).eq(domain_labels.view(N, 1).expand(N, N).t())
+        is_same_img = vec1.expand([N, N]).eq(vec1.expand([N, N]).t())
+        is_same_instance = all_targets.reshape([N, 1]).expand([N, N]).equal(all_targets.reshape([N, 1]).expand([N, N]).t())
+        is_same_domain = domain_labels.reshape([N, 1]).expand([N, N]).equal(domain_labels.reshape([N, 1]).expand([N, N]).t())
 
         set0 = is_same_img
 
@@ -161,8 +161,8 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
         dist_ap, dist_an = hard_example_mining(dist_mat, is_pos, is_neg)
     else:
         dist_ap, dist_an = weighted_example_mining(dist_mat, is_pos, is_neg)
-
-    y = dist_an.new().resize_as_(dist_an).fill_(1)
+    y = paddle.ones_like(dist_an)
+   # y = dist_an.new().resize_as_(dist_an).fill_(1)
 
     if margin > 0:
         # all(sum(is_pos) == 1)

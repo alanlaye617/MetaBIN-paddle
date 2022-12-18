@@ -6,8 +6,8 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 
-from utils.weight_translate import weight_translate
-from utils.build_ref_model import build_ref_model
+from utils.translate_weight import translate_weight
+from utils.build_ref_trainer import build_ref_trainer
 from modeling import build_resnet_backbone, Metalearning
 from data import build_reid_test_loader
 
@@ -22,15 +22,15 @@ def metric_test():
     reprod_log_ref = ReprodLogger()
     reprod_log_pad = ReprodLogger()
 
-    torch_path = "./data/backbone.pth"
-    paddle_path = "./data/backbone.pdparams"
+    torch_path = "./model_weights/model.pth"
+    paddle_path = "./model_weights/model.pdparams"
 
-    model_ref = build_ref_model(4).cuda()
+    model_ref = build_ref_trainer(4).cuda()
 #    model_ref = build_ref_model().backbone.cuda()
     torch.save(model_ref.state_dict(), torch_path)
     model_ref.eval()
 
-    weight_translate(torch_path, paddle_path)
+    translate_weight(torch_path, paddle_path)
 
 #    model_pad = build_resnet_backbone()
     model_pad = Metalearning(num_classes=4)
@@ -38,15 +38,14 @@ def metric_test():
     model_pad.eval()
 
     test_loader_lite, num_query_lite= build_reid_test_loader('LiteData', 20, num_workers=0)
-    for x in test_loader_lite:
-        break
-    inputs = x['images'].numpy()
+    inputs = next(test_loader_lite.__iter__())
+
     inputs_ref = torch.tensor(inputs, dtype=torch.float32).cuda()
     outputs_ref = model_ref(inputs_ref)
     reprod_log_ref.add("metric", outputs_ref.cpu().detach().numpy())
     del outputs_ref, inputs_ref
 
-    inputs_pad = paddle.to_tensor(inputs, dtype=paddle.float32)
+    inputs_pad = inputs
     outputs_pad = model_pad(inputs_pad)
     reprod_log_pad.add("metric", outputs_pad.detach().numpy())
     del outputs_pad, inputs_pad
