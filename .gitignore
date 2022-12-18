@@ -1,4 +1,5 @@
-refs/*
+refs/datasets/*
+refs/logs/Sample/M-resnet/event*
 !refs/reference
 datasets/DukeMTMC-reID
 datasets/Market-1501-v15.09.15
