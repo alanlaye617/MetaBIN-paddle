@@ -63,7 +63,7 @@ def setup(args):
         default_setup(cfg, args)
     return cfg
 
-def get_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True, resume=True):
+def create_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True, resume=True):
     args = default_argument_parser().parse_args()
     args.config_file = config_file
     args.eval_only = eval_only
@@ -72,7 +72,7 @@ def get_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True, re
     return cfg
 
 def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
-    cfg = get_cfg()
+    cfg = create_cfg()
 
     # cfg.MODEL.WEIGHTS = "./logs/Visualize/u01/model_final.pth"
     # Trainer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
@@ -88,13 +88,13 @@ def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], tes
     return trainer
 
 def build_ref_model(num_classes):
-    cfg = get_cfg()
+    cfg = create_cfg()
     cfg.defrost()
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
     return Trainer.build_model(cfg)
 
 def build_ref_evaluator(num_query):
-    cfg = get_cfg()
+    cfg = create_cfg()
     cfg.defrost()
     return ReidEvaluator(cfg, num_query)
 

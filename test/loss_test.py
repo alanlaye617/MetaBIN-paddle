@@ -1,22 +1,20 @@
 import paddle
-from paddle import nn
-import paddle.nn.functional as F
 import torch
 import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 import sys
 sys.path.append('.')
-from utils import translate_weight, build_ref_model, translate_inputs
-from modeling import build_resnet_backbone, Metalearning
+from utils import translate_weight, build_ref_model, translate_inputs_p2t
+from modeling import Metalearning
 from data import build_train_loader_for_m_resnet
 
 def loss_test():
     paddle.device.set_device('gpu:0')
 
     seed = 2022
-    np.random.seed = seed
-    random.seed = seed
+    np.random.seed(seed)
+    random.seed(seed)
 
     reprod_log_ref = ReprodLogger()
     reprod_log_pad = ReprodLogger()
@@ -37,7 +35,7 @@ def loss_test():
     train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['LiteData'], batch_size=16, num_workers=0)
     inputs = next(train_loader.__iter__())
 
-    inputs_ref = translate_inputs(inputs)
+    inputs_ref = translate_inputs_p2t(inputs)
     outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
     losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
 

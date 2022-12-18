@@ -1,14 +1,12 @@
 import paddle
-from paddle import nn
-import paddle.nn.functional as F
 import torch
 import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 import sys
 sys.path.append('.')
-from utils import translate_weight, build_ref_model, build_ref_evaluator, translate_inputs
-from modeling import build_resnet_backbone, Metalearning
+from utils import translate_weight, build_ref_model, build_ref_evaluator, translate_inputs_p2t
+from modeling import Metalearning
 from data import build_reid_test_loader
 from evaluation import ReidEvaluator
 
@@ -16,8 +14,8 @@ def metric_test():
     paddle.device.set_device('gpu:0')
 
     seed = 2022
-    np.random.seed = seed
-    random.seed = seed
+    np.random.seed(seed)
+    random.seed(seed)
 
     reprod_log_ref = ReprodLogger()
     reprod_log_pad = ReprodLogger()
@@ -40,7 +38,7 @@ def metric_test():
     test_loader, num_query= build_reid_test_loader('LiteData', 20, num_workers=0)
     inputs = next(test_loader.__iter__())
 
-    inputs_ref = translate_inputs(inputs, if_train=False)
+    inputs_ref = translate_inputs_p2t(inputs, if_train=False)
     outputs_ref = model_ref(inputs_ref)
     evaluator_ref = build_ref_evaluator(num_query)
     evaluator_ref.process(inputs_ref, outputs_ref.cpu().detach())
