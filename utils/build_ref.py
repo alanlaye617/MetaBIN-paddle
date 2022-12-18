@@ -86,4 +86,14 @@ def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], tes
 #    trainer.resume_or_load(resume=args.resume)
     return trainer
 
+def build_ref_model(num_classes):
+    args = default_argument_parser().parse_args()
+    args.config_file = './refs/configs/Sample/M-resnet.yml'
+    args.eval_only = True
+    args.resume = True
+    cfg = setup(args)
+    cfg.defrost()
+    cfg.MODEL.HEADS.NUM_CLASSES = num_classes
+    print("Command Line Args:", args)    
+    return Trainer.build_model(cfg)
 

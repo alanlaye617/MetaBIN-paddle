@@ -8,8 +8,7 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight
-from utils.build_ref_trainer import build_ref_trainer
+from utils import translate_weight, build_ref_model
 from modeling import build_resnet_backbone
 
 def forward_test():
@@ -25,7 +24,7 @@ def forward_test():
     torch_path = "./model_weights/backbone.pth"
     paddle_path = "./model_weights/backbone.pdparams"
 
-    model_ref = build_ref_trainer(4, batch_size=6).model.backbone.cuda()
+    model_ref = build_ref_model(num_classes=1).backbone.cuda()
     torch.save(model_ref.state_dict(), torch_path)
     model_ref.eval()
 

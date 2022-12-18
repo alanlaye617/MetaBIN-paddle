@@ -115,6 +115,7 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
     #    all_embedding = embedding
     #    all_targets = targets
     all_embedding = embedding
+
     all_targets = targets  
     if dist_type == 'euclidean':
         dist_mat = euclidean_dist(all_embedding, all_embedding)
@@ -161,6 +162,7 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
         dist_ap, dist_an = hard_example_mining(dist_mat, is_pos, is_neg)
     else:
         dist_ap, dist_an = weighted_example_mining(dist_mat, is_pos, is_neg)
+
     y = paddle.ones_like(dist_an)
    # y = dist_an.new().resize_as_(dist_an).fill_(1)
 

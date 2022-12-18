@@ -33,14 +33,14 @@ class MetalearningHead(nn.Layer):
         global_feat = self.pool_layer(features)
         bn_feat = self.classifier_norm(global_feat, opt)
         if len(bn_feat.shape) == 4:
-            bn_feat = bn_feat[..., 0, 0]
+            bn_feat = bn_feat.flatten(1)
         if not self.training: return bn_feat
         cls_outputs = self.classifier_fc(bn_feat, opt)
         pred_class_logits = F.linear(bn_feat, self.classifier_fc.weight) # compute accuracy
         return {
             "cls_outputs": cls_outputs,
             "pred_class_logits": pred_class_logits,
-            "pooled_features": global_feat[..., 0, 0],
+            "pooled_features": global_feat.flatten(1),
             "bn_features": bn_feat,
         }
 

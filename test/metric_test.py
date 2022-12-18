@@ -6,8 +6,7 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 
-from utils.translate_weight import translate_weight
-from utils.build_ref_trainer import build_ref_trainer
+from utils import translate_weight, build_ref_model
 from modeling import build_resnet_backbone, Metalearning
 from data import build_reid_test_loader
 
