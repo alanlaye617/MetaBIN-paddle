@@ -35,17 +35,11 @@ def loss_test():
  #   model_pad.eval()
 
     train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['LiteData'], batch_size=16, num_workers=0)
-
     inputs = next(train_loader.__iter__())
 
     inputs_ref = translate_inputs(inputs)
-    output_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
-    losses_ref = model_ref.losses(output_ref, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
-
-#    reprod_log_ref.add("pred_class_logits", output_ref['outputs']['pred_class_logits'].cpu().detach().numpy())
-#    reprod_log_ref.add("cls_outputs", output_ref['outputs']['cls_outputs'].cpu().detach().numpy())
-#    reprod_log_ref.add("pooled_features", output_ref['outputs']['pooled_features'].cpu().detach().numpy())
-#    reprod_log_ref.add("bn_features", output_ref['outputs']['bn_features'].cpu().detach().numpy())
+    outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
+    losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
 
     reprod_log_ref.add("CEloss", losses_ref['loss_cls'].cpu().detach().numpy())
     reprod_log_ref.add("Tripletloss", losses_ref['loss_triplet'].cpu().detach().numpy())
@@ -53,11 +47,6 @@ def loss_test():
     inputs_pad = inputs
     outputs_pad = model_pad(inputs_pad, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
     losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
-
-#    reprod_log_pad.add("pred_class_logits", outputs_pad['outputs']['pred_class_logits'].cpu().detach().numpy())
-#    reprod_log_pad.add("cls_outputs", outputs_pad['outputs']['cls_outputs'].cpu().detach().numpy())
-#    reprod_log_pad.add("pooled_features", outputs_pad['outputs']['pooled_features'].cpu().detach().numpy())
-#    reprod_log_pad.add("bn_features", outputs_pad['outputs']['bn_features'].cpu().detach().numpy())
 
     reprod_log_pad.add("CEloss", losses_pad['loss_cls'].cpu().detach().numpy())
     reprod_log_pad.add("Tripletloss", losses_pad['loss_triplet'].cpu().detach().numpy())

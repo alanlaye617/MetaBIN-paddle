@@ -1,11 +1,9 @@
-[2022/12/17 01:23:30] root INFO: forwards_logits_0: 
-[2022/12/17 01:23:30] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/17 01:23:30] root INFO: forwards_logits_1: 
-[2022/12/17 01:23:30] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/17 01:23:30] root INFO: forwards_logits_2: 
-[2022/12/17 01:23:30] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/17 01:23:30] root INFO: forwards_logits_3: 
-[2022/12/17 01:23:30] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/17 01:23:30] root INFO: forwards_logits_4: 
-[2022/12/17 01:23:30] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/17 01:23:30] root INFO: diff check passed
+[2022/12/18 22:51:55] root INFO: pred_class_logits: 
+[2022/12/18 22:51:55] root INFO: 	mean diff: check passed: True, value: 1.9003637419245933e-07
+[2022/12/18 22:51:55] root INFO: cls_outputs: 
+[2022/12/18 22:51:55] root INFO: 	mean diff: check passed: True, value: 1.9003637419245933e-07
+[2022/12/18 22:51:55] root INFO: pooled_features: 
+[2022/12/18 22:51:55] root INFO: 	mean diff: check passed: True, value: 1.4974148143664934e-08
+[2022/12/18 22:51:55] root INFO: bn_features: 
+[2022/12/18 22:51:55] root INFO: 	mean diff: check passed: True, value: 1.9192430045222864e-07
+[2022/12/18 22:51:55] root INFO: diff check passed
