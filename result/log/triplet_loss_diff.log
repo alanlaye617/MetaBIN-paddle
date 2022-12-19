@@ -1,0 +1,5 @@
+[2022/12/19 20:55:13] root INFO: feat: 
+[2022/12/19 20:55:13] root INFO: 	mean diff: check passed: True, value: 1.5234604688885156e-08
+[2022/12/19 20:55:13] root INFO: dist: 
+[2022/12/19 20:55:13] root INFO: 	mean diff: check passed: False, value: 0.0005701453192159534
+[2022/12/19 20:55:13] root INFO: diff check failed

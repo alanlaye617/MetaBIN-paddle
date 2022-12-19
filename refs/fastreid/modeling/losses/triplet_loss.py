@@ -115,12 +115,12 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
     else:
         all_embedding = embedding
         all_targets = targets
-
+    
     if dist_type == 'euclidean':
         dist_mat = euclidean_dist(all_embedding, all_embedding)
     elif dist_type == 'cosine':
         dist_mat = cosine_dist(all_embedding, all_embedding)
-
+    return dist_mat
     N = dist_mat.size(0)
     if (pos_flag == [1,0,0] and neg_flag == [0,1,1]) or domain_labels == None:
         is_pos = all_targets.view(N, 1).expand(N, N).eq(all_targets.view(N, 1).expand(N, N).t())
