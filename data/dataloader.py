@@ -83,7 +83,7 @@ def build_reid_train_loader(dataset_list, num_workers,
     # transforms
     train_transforms = build_transforms(is_train=True, is_fake=False)
     if synth_flag:
-        synth_flag = build_transforms(is_train=True, is_fake=True)
+        synth_transforms = build_transforms(is_train=True, is_fake=True)
         meta_loader_flag = 'each'
     else:
         synth_transforms = None
