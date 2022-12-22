@@ -8,10 +8,10 @@ trainer_ref = build_ref_trainer(batch_size=16)
 scheduler = build_lr_scheduler([1, 2])
 optimizer_main_ref = trainer_ref.optimizer_main
 optimizer_norm_ref = trainer_ref.optimizer_norm
-
-optimizer_main_pad = build_optimizer(Metalearning(num_classes=751), learning_rate=0.01, lr_scheduler=scheduler, flag='main')
-optimizer_norm_pad = build_optimizer(Metalearning(num_classes=751), learning_rate=0.01, lr_scheduler=scheduler, flag='norm')
-
+model_pad = Metalearning(num_classes=751)
+optimizer_main_pad = build_optimizer(model_pad, learning_rate=0.01, lr_scheduler=scheduler, flag='main')
+optimizer_norm_pad = build_optimizer(model_pad, learning_rate=0.01, lr_scheduler=scheduler, flag='norm')
+model_pad.named_parameters
 dict_ref = {k['name']:{'lr': k['initial_lr'], 'weight_decay': k['weight_decay']}for k in optimizer_main_ref.param_groups}
 dict_ref.update({k['name']:{'lr': k['initial_lr'], 'weight_decay': k['weight_decay']}for k in optimizer_norm_ref.param_groups})
 
