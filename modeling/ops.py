@@ -212,13 +212,12 @@ class meta_bn(nn.BatchNorm2D):
 
         if compute_each_batch:
             domain_idx = opt['domains']
-            unique_domain_idx = [int(x) for x in paddle.unique(domain_idx)]
+            unique_domain_idx = [int(x) for x in paddle.unique(domain_idx).cpu()]
             cnt = 0
             for j in unique_domain_idx:
                 t_logical_domain = domain_idx == j
 
                 if norm_type == "general":  # update, but not apply running_mean/var
-                    result_local = F.batch_norm()
                     result_local = F.batch_norm(inputs[t_logical_domain], self._mean, self._variance,
                                           updated_weight, updated_bias,
                                           self.training, self._momentum, self._epsilon)
@@ -227,7 +226,7 @@ class meta_bn(nn.BatchNorm2D):
                                           updated_weight, updated_bias,
                                           self.training, self._momentum, self._epsilon)
                 elif norm_type == "eval":  # fix and apply running_mean/var,
-                    if self.running_mean is None:
+                    if self._mean is None:
                         result_local = F.batch_norm(inputs[t_logical_domain], None, None,
                                               updated_weight, updated_bias,
                                               True, self._momentum, self._epsilon)

@@ -3,7 +3,7 @@ from paddle import optimizer
 from paddle.optimizer import Optimizer
 
 
-def build_optimizer(model, learning_rate, lr_scheduler, momentum, flag = None):
+def build_optimizer(model, learning_rate, lr_scheduler, momentum=0.9, flag = None):
     params = []
     assert flag in ['main', 'norm'], NameError('Unknown flag'+str(flag))
     for key, value in model.named_parameters():

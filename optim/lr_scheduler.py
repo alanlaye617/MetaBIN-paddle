@@ -4,7 +4,7 @@ from paddle import optimizer
 from paddle.optimizer.lr import LRScheduler
 
 
-def build_lr_scheduler(milestones, gamma, warmup_factor, warmup_iters, warmup_method, last_epoch, verbose):
+def build_lr_scheduler(milestones, gamma=0.1, warmup_factor=0.001, warmup_iters=1000, warmup_method='linear', last_epoch=-1, verbose=False):
     return WarmupMultiStepLR(1, milestones, gamma, warmup_factor, warmup_iters, warmup_method, last_epoch, verbose)
 
 

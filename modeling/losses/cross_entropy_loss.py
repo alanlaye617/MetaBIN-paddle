@@ -5,7 +5,6 @@
 """
 import paddle
 import paddle.nn.functional as F
-from paddle import nn
 
 
 def cross_entropy_loss(pred_class_logits, gt_classes, eps, alpha=0.2):
