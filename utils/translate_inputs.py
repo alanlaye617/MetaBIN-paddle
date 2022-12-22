@@ -21,7 +21,7 @@ def translate_inputs_t2p(inputs_ref, if_train=True):
     inputs_pad['camid'] = paddle.to_tensor(inputs_ref['camid'].numpy(), dtype=paddle.int64)
     inputs_pad['img_path'] = copy.deepcopy(inputs_ref['img_path'])
     if if_train:
-        inputs_pad['domains'] = {'domains': paddle.to_tensor(inputs_ref['others']['domains'].numpy(), dtype=paddle.int64)}
+        inputs_pad['domains'] = paddle.to_tensor(inputs_ref['others']['domains'].numpy(), dtype=paddle.int64)
     else:
-        inputs_pad['domains'] = {'domains': inputs_ref['others']['domains']}
+        inputs_pad['domains'] = inputs_ref['others']['domains']
     return inputs_pad
