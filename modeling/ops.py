@@ -167,6 +167,7 @@ class Meta_bn_norm(nn.BatchNorm2D):
             bias_freeze = norm_opt['BN_B_FREEZE']
         lr = (0.0 if norm_opt['BN_AFFINE'] else 1.0)
         use_global_stats = norm_opt['BN_RUNNING']
+        self.affine = ['BN_AFFINE']
         weight_attr = paddle.ParamAttr(
             initializer=(nn.initializer.Constant(weight_init) if weight_init is not None else None), 
             learning_rate=lr)

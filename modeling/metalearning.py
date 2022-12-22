@@ -23,9 +23,9 @@ class Metalearning(nn.Layer):
 
             outs = dict()
             assert "targets" in batched_inputs, "Person ID annotation are missing in training!"
-            outs['targets'] = batched_inputs["targets"]
+            outs['targets'] = batched_inputs["targets"].cast(paddle.float64)
             if 'domains' in batched_inputs.keys():
-                outs['domains'] = batched_inputs['domains']
+                outs['domains'] = batched_inputs['domains'].cast(paddle.float64)
             if outs['targets'].sum() < 0: outs['targets'].zero_()
             
             features = self.backbone(images, opt)

@@ -71,7 +71,7 @@ def create_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True,
     cfg = setup(args)
     return cfg
 
-def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
+def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
     cfg = create_cfg()
 
     # cfg.MODEL.WEIGHTS = "./logs/Visualize/u01/model_final.pth"
@@ -81,8 +81,8 @@ def build_ref_trainer(num_classes, batch_size, train_dataset=['Market1501'], tes
     cfg.DATASETS.TESTS = test_dataset
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.SOLVER.IMS_PER_BATCH = batch_size
+    cfg.TEST.IMS_PER_BATCH = batch_size
     cfg.MODEL.BACKBONE.PRETRAIN = False
-    cfg.MODEL.HEADS.NUM_CLASSES = num_classes
     trainer = Trainer(cfg)
 #    trainer.resume_or_load(resume=args.resume)
     return trainer
