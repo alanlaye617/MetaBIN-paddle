@@ -3,7 +3,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from .resnet import build_resnet_backbone
 from .heads import MetalearningHead
-from .losses import cross_entropy_loss, triplet_loss
+from .losses import cross_entropy_loss, triplet_loss, domain_SCT_loss
 
 class Metalearning(nn.Layer):
     def __init__(self, num_classes,  name_scope=None, dtype="float32"):
@@ -65,6 +65,13 @@ class Metalearning(nn.Layer):
         loss_dict = {}
         # log_accuracy(pred_class_logits, gt_labels) # Log prediction accuracy
 
+        if "SCT" in loss_names:
+            loss_dict['loss_stc'] = domain_SCT_loss(
+                pooled_features,
+                domain_labels,
+                norm_feat=True,
+                type='cosine_sim',
+            ) * 1.0
 
         if "CrossEntropyLoss" in loss_names:
                 loss_dict['loss_cls'] = cross_entropy_loss(
