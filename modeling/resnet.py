@@ -3,47 +3,20 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddleseg.cvlibs import param_init
 import math
-from .ops import meta_norm, meta_conv2d
-
-
-class BasicBlock(nn.Layer):
-    expansion = 1
-    def __init__(self, in_channels, hidden_channels, bn_norm, norm_opt, stride=1, 
-                downsample=None, name_scope=None, dtype="float32"):
-        super().__init__(name_scope, dtype)
-        self.conv1 = meta_conv2d(in_channels, hidden_channels, kernel_size = 3, stride=stride, padding=1, bias_attr=False)
-        self.bn1 = meta_norm(bn_norm, hidden_channels, norm_opt)
-        self.conv2 = meta_conv2d(hidden_channels, hidden_channels, kernel_size = 3, stride=1, padding=1, bias_attr=False)
-        self.bn2 = meta_norm(bn_norm, hidden_channels, norm_opt)
-        self.relu = nn.ReLU()
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x, opt = None):
-        identity = x
-        out = self.conv1(x, opt)
-        out = self.bn1(out, opt)
-        out = self.relu(out)
-        out = self.conv2(out, opt)
-        out = self.bn2(out, opt)
-        if self.downsample is not None:
-            identity = self.downsample(x, opt)
-        out += identity
-        out = self.relu(out)
-        return out
+from .ops import meta_conv2d, meta_bin
 
 
 class Bottleneck(nn.Layer):
     expansion = 4
-    def __init__(self, in_channels, hidden_channels, bn_norm, norm_opt, stride=1,
+    def __init__(self, in_channels, hidden_channels, norm_opt, stride=1,
                 downsample=None, name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
         self.conv1 = meta_conv2d(in_channels, hidden_channels, kernel_size=1, bias_attr=False)
-        self.bn1 = meta_norm(bn_norm, hidden_channels, norm_opt)
+        self.bn1 = meta_bin(hidden_channels, norm_opt)
         self.conv2 = meta_conv2d(hidden_channels, hidden_channels, kernel_size=3, stride=stride, padding=1, bias_attr=False)
-        self.bn2 = meta_norm(bn_norm, hidden_channels, norm_opt)
+        self.bn2 = meta_bin(hidden_channels, norm_opt)
         self.conv3 = meta_conv2d(hidden_channels, hidden_channels * self.expansion, kernel_size=1, bias_attr=False)
-        self.bn3 = meta_norm(bn_norm, hidden_channels * self.expansion, norm_opt)
+        self.bn3 = meta_bin(hidden_channels * self.expansion, norm_opt)
         self.relu = nn.ReLU()
         self.downsample = downsample
         self.stride = stride
@@ -67,10 +40,10 @@ class Bottleneck(nn.Layer):
 
 
 class Downsample(nn.Layer):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, enable_bias, bn_norm, norm_opt, name_scope=None, dtype="float32"):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, enable_bias, norm_opt, name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
         self.conv = meta_conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, bias_attr=enable_bias)
-        self.bn = meta_norm(bn_norm, out_channels, norm_opt)
+        self.bn = meta_bin(out_channels, norm_opt)
 
     def forward(self, x, opt = None):
         x = self.conv(x, opt)
@@ -79,28 +52,28 @@ class Downsample(nn.Layer):
 
 
 class ResNet(nn.Layer):
-    def __init__(self, last_stride, bn_norm, norm_opt, block, layers, name_scope=None, dtype="float32"):
+    def __init__(self, last_stride, norm_opt, layers, name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
         self.in_channels = 64
         self.conv1 = meta_conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias_attr=False)
-        self.bn1 = meta_norm(bn_norm, 64, norm_opt)
+        self.bn1 = meta_bin(64, norm_opt)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2D(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], 1, bn_norm, norm_opt)
-        self.layer2 = self._make_layer(block, 128, layers[1], 2, bn_norm, norm_opt)
-        self.layer3 = self._make_layer(block, 256, layers[2], 2, bn_norm, norm_opt)
-        self.layer4 = self._make_layer(block, 512, layers[3], last_stride, bn_norm, norm_opt)
+        self.layer1 = self._make_layer(64, layers[0], 1, norm_opt)
+        self.layer2 = self._make_layer(128, layers[1], 2, norm_opt)
+        self.layer3 = self._make_layer(256, layers[2], 2, norm_opt)
+        self.layer4 = self._make_layer(512, layers[3], last_stride, norm_opt)
         self.random_init()
     
-    def _make_layer(self, block, hidden_channels, n_repeats, stride, bn_norm, norm_opt):
+    def _make_layer(self, hidden_channels, n_repeats, stride, norm_opt):
         downsample = None
-        if stride != 1 or self.in_channels != hidden_channels * block.expansion:
-            downsample = Downsample(self.in_channels, hidden_channels * block.expansion, 1, stride, False, bn_norm, norm_opt)
+        if stride != 1 or self.in_channels != hidden_channels * Bottleneck.expansion:
+            downsample = Downsample(self.in_channels, hidden_channels * Bottleneck.expansion, 1, stride, False, norm_opt)
         layers = []
-        layers.append(block(self.in_channels, hidden_channels, bn_norm, norm_opt, stride, downsample))
-        self.in_channels = hidden_channels * block.expansion
+        layers.append(Bottleneck(self.in_channels, hidden_channels, norm_opt, stride, downsample))
+        self.in_channels = hidden_channels * Bottleneck.expansion
         for _ in range(1, n_repeats):
-            layers.append(block(self.in_channels, hidden_channels, bn_norm, norm_opt))
+            layers.append(Bottleneck(self.in_channels, hidden_channels, norm_opt))
         return nn.Sequential(*layers)
 
     def forward(self, x, opt = None):
@@ -153,9 +126,8 @@ def build_resnet_backbone():
     #with_nl = False     # cfg.MODEL.BACKBONE.WITH_NL
     depth = 50      # cfg.MODEL.BACKBONE.DEPTH
 
-    num_blocks_per_stage = {18: [2,2,2,2], 34: [3, 4, 6, 3], 50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3], }[depth]
-    block = {18: BasicBlock, 34: BasicBlock, 50: Bottleneck, 101: Bottleneck, 152:Bottleneck,}[depth]
-    model = ResNet(last_stride, bn_norm, norm_opt, block, num_blocks_per_stage)
+    num_blocks_per_stage = [3, 4, 6, 3]
+    model = ResNet(last_stride, norm_opt, num_blocks_per_stage)
     return model
 
 

@@ -108,18 +108,18 @@ def meta_norm(norm, out_channels, norm_opt, **kwargs):
         if len(norm) == 0:
             return None
         norm = {
-            "BN": Meta_bn_norm(out_channels, norm_opt, **kwargs),
-            "IN": Meta_in_norm(out_channels, norm_opt, **kwargs),
-            "BIN_gate2": Meta_bin_gate_ver2(out_channels, norm_opt, **kwargs),
+            "BN": meta_bn(out_channels, norm_opt, **kwargs),
+            "IN": meta_in(out_channels, norm_opt, **kwargs),
+            "BIN_gate2": meta_bin(out_channels, norm_opt, **kwargs),
         }[norm]
     return norm
 
 
-class Meta_bin_gate_ver2(nn.Layer):
+class meta_bin(nn.Layer):
     def __init__(self, num_features, norm_opt = None, **kwargs):
         super().__init__()
-        self.bat_n = Meta_bn_norm(num_features, norm_opt, **kwargs)
-        self.ins_n = Meta_in_norm(num_features, norm_opt, **kwargs)
+        self.bat_n = meta_bn(num_features, norm_opt, **kwargs)
+        self.ins_n = meta_in(num_features, norm_opt, **kwargs)
         if norm_opt['BIN_INIT'] == 'one':
             gate_init = nn.initializer.Constant(1)
         elif norm_opt['BIN_INIT'] == 'zero':
@@ -157,24 +157,17 @@ class Meta_bin_gate_ver2(nn.Layer):
         return out
 
 
-class Meta_bn_norm(nn.BatchNorm2D):
-    def __init__(self, num_features, norm_opt, momentum=0.9, epsilon=0.00001,
-                weight_freeze = False, bias_freeze = False, weight_init = 1.0, bias_init = 0.0,
+class meta_bn(nn.BatchNorm2D):
+    def __init__(self, num_features, norm_opt, momentum=0.9, epsilon=1e-05,
+                weight_freeze = False, bias_freeze = False,
                 data_format='NCHW', use_global_stats=None, name=None):
         if not weight_freeze:
             weight_freeze = norm_opt['BN_W_FREEZE']
         if not bias_freeze:
             bias_freeze = norm_opt['BN_B_FREEZE']
-        lr = (0.0 if norm_opt['BN_AFFINE'] else 1.0)
         use_global_stats = norm_opt['BN_RUNNING']
-        self.affine = ['BN_AFFINE']
-        weight_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(weight_init) if weight_init is not None else None), 
-            learning_rate=lr)
-        bias_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(bias_init) if bias_init is not None else None), 
-            learning_rate=lr)
-        super().__init__(num_features, momentum, epsilon, weight_attr, bias_attr, data_format, use_global_stats, name)
+        self.affine = False
+        super().__init__(num_features, momentum, epsilon, None, None, data_format, use_global_stats, name)
         self.weight.stop_gradient = weight_freeze
         self.bias.stop_gradient = bias_freeze
 
@@ -269,26 +262,19 @@ class Meta_bn_norm(nn.BatchNorm2D):
                                           False, self._momentum, self._epsilon)
         return result
 
-class Meta_in_norm(nn.InstanceNorm2D):
-    def __init__(self, num_features, norm_opt, epsilon=0.00001, momentum=0.9, 
-                weight_freeze = False, bias_freeze = False, weight_init = 1.0, bias_init = 0.0,
+class meta_in(nn.InstanceNorm2D):
+    def __init__(self, num_features, norm_opt, epsilon=1e-05, momentum=0.9, 
+                weight_freeze = False, bias_freeze = False,
                 data_format="NCHW", name=None):
         if not weight_freeze:
             weight_freeze = norm_opt['IN_W_FREEZE']
         if not bias_freeze:
             bias_freeze = norm_opt['IN_B_FREEZE']
-        self.affine = norm_opt['IN_AFFINE']
-        lr = (0.0 if norm_opt['IN_AFFINE'] else 1.0)
+        self.affine = False
         use_global_stats = norm_opt['IN_RUNNING']
-        weight_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(weight_init) if weight_init is not None else None), 
-            learning_rate=lr)
-        bias_attr = paddle.ParamAttr(
-            initializer=(nn.initializer.Constant(bias_init) if bias_init is not None else None), 
-            learning_rate=lr)
         self._mean = None
         self._variance = None
-        super().__init__(num_features, epsilon, momentum, weight_attr, bias_attr, data_format, name)
+        super().__init__(num_features, epsilon, momentum, None, None, data_format, name)
         self.in_fc_multiply = norm_opt['IN_FC_MULTIPLY']
         self._momentum = momentum
 

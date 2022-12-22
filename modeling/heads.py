@@ -1,7 +1,7 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from .ops import meta_norm, meta_linear, meta_conv2d
+from .ops import meta_bn, meta_linear, meta_conv2d
 
 class MetalearningHead(nn.Layer):
     def __init__(self, num_classes, name_scope=None, dtype="float32"):
@@ -23,7 +23,7 @@ class MetalearningHead(nn.Layer):
         self.pool_layer = nn.AdaptiveAvgPool2D(1)
         in_feat = 2048
        # self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt, bias_freeze=True)
-        self.classifier_norm = meta_norm('BN', in_feat, norm_opt=norm_opt, bias_freeze=True)
+        self.classifier_norm = meta_bn(in_feat, norm_opt=norm_opt, bias_freeze=True)
 
         num_classes = num_classes
         # cls_type = linear

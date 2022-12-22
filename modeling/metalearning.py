@@ -6,10 +6,10 @@ from .heads import MetalearningHead
 from .losses import cross_entropy_loss, triplet_loss
 
 class Metalearning(nn.Layer):
-    def __init__(self, num_classes, pixel_mean=[123.675, 116.28, 103.53], pixel_std=[58.395, 57.120000000000005, 57.375],  name_scope=None, dtype="float32"):
+    def __init__(self, num_classes,  name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
-        pixel_mean = paddle.to_tensor(pixel_mean).unsqueeze((0, -1, -1))
-        pixel_std = paddle.to_tensor(pixel_std).unsqueeze((0, -1, -1))
+        pixel_mean = paddle.to_tensor([123.675, 116.28, 103.53]).unsqueeze((0, -1, -1))
+        pixel_std = paddle.to_tensor([58.395, 57.120000000000005, 57.375]).unsqueeze((0, -1, -1))
         self.register_buffer('pixel_mean', pixel_mean)
         self.register_buffer('pixel_std', pixel_std)
         self.backbone = build_resnet_backbone() # resnet-50
