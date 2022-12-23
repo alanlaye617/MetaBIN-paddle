@@ -18,6 +18,8 @@ from contextlib import contextmanager
 #from .evaluator import DatasetEvaluator
 from .rank import evaluate_rank
 from tqdm import tqdm
+#from utils import translate_inputs_t2p
+
 
 class ReidEvaluator(object):
     def __init__(self, num_query):
@@ -115,6 +117,7 @@ def inference_on_dataset(model, data_loader, evaluator, opt=None):
     total_compute_time = 0
     with inference_context(model), paddle.no_grad():
         for idx, inputs in tqdm(enumerate(data_loader)):
+          #  inputs = translate_inputs_t2p(inputs, is_train=False)
             if idx == num_warmup:
                 start_time = time.perf_counter()
                 total_compute_time = 0
@@ -128,9 +131,9 @@ def inference_on_dataset(model, data_loader, evaluator, opt=None):
             idx += 1
             iters_after_start = idx + 1 - num_warmup * int(idx >= num_warmup)
             seconds_per_batch = total_compute_time / iters_after_start
-            #if idx >= num_warmup * 2 or seconds_per_batch > 30:
-            #    total_seconds_per_img = (time.perf_counter() - start_time) / iters_after_start
-            #    eta = datetime.timedelta(seconds=int(total_seconds_per_img * (total - idx - 1)))
+            if idx >= num_warmup * 2 or seconds_per_batch > 30:
+                total_seconds_per_img = (time.perf_counter() - start_time) / iters_after_start
+                eta = datetime.timedelta(seconds=int(total_seconds_per_img * (total - idx - 1)))
             #    log_every_n_seconds(
             #        logging.INFO,
             #        "Inference done {}/{}. {:.4f} s / batch. ETA={}".format(
@@ -172,7 +175,7 @@ def inference_context(model):
     Args:
         model: a torch Module
     """
-    training_mode = model.training
+    #training_mode = model.training
     model.eval()
     yield
-    model.train(training_mode)
+    model.train()

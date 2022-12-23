@@ -1,1 +1,1 @@
-from .evaluator import ReidEvaluator
+from .evaluator import ReidEvaluator, inference_on_dataset
