@@ -24,34 +24,47 @@ def backward_test():
     torch_path = "./model_weights/model.pth"
     paddle_path = "./model_weights/model.pdparams"
 
-    trainer_ref = build_ref_trainer(num_classes=751, batch_size=16)
+    batch_size = 32
+    base_lr = 0.01
+    
+    trainer_ref = build_ref_trainer(batch_size=batch_size)
     train_loader = trainer_ref.data_loader
-    model_ref = trainer_ref.model.cuda()
-    optimizer_ref = trainer_ref.optimizer_main
-    scheduler_ref = trainer_ref.scheduler_main
+    model_ref = trainer_ref.model
+    scheduler_main_ref = trainer_ref.scheduler_main
+    scheduler_norm_ref = trainer_ref.scheduler_norm
+    optimizer_main_ref = trainer_ref.optimizer_main
+    optimizer_norm_ref = trainer_ref.optimizer_norm
+
     torch.save(model_ref.state_dict(), torch_path)
    # model_ref.eval()
 
     translate_weight(torch_path, paddle_path)
 
-    model_pad = Metalearning(751)
+    model_pad = Metalearning(num_classes=751)
     model_pad.set_state_dict(paddle.load(paddle_path))
-   # model_pad.eval()
 
-    scheduler_pad = build_lr_scheduler(
-        milestones=scheduler_ref.milestones,
-        gamma=scheduler_ref.gamma,
-        warmup_factor=scheduler_ref.warmup_factor,
-        warmup_iters=scheduler_ref.warmup_iters,
-        warmup_method=scheduler_ref.warmup_method,
-        last_epoch=-1,
-        verbose=False
-        )
-    
- #   model_pad.heads.classifier_norm.weight.set_value(model_pad.heads.classifier_norm.weight*1000)
-    optimizer_pad = build_optimizer(model=model_pad, learning_rate=0.01, lr_scheduler=scheduler_pad, momentum=0.9, flag='main')        
-  #  optimizer_pad = build_optimizer(model=model_pad, lr_scheduler=0.001, momentum=0.9, flag='main')
-    #train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['Market1501'], batch_size=16, num_workers=0)
+    scheduler_main_pad = build_lr_scheduler(
+            milestones=scheduler_main_ref.milestones,
+            gamma=scheduler_main_ref.gamma,
+            warmup_factor=scheduler_main_ref.warmup_factor,
+            warmup_iters=scheduler_main_ref.warmup_iters,
+            warmup_method=scheduler_main_ref.warmup_method,
+            last_epoch=-1,
+            verbose=False
+            )
+    scheduler_norm_pad = build_lr_scheduler(
+            milestones=scheduler_norm_ref.milestones,
+            gamma=scheduler_norm_ref.gamma,
+            warmup_factor=scheduler_norm_ref.warmup_factor,
+            warmup_iters=scheduler_norm_ref.warmup_iters,
+            warmup_method=scheduler_norm_ref.warmup_method,
+            last_epoch=-1,
+            verbose=False
+            )
+
+    optimizer_main_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_main_pad, flag='main')
+    optimizer_norm_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_norm_pad, flag='norm')
+
     for i in tqdm(range(5)):
         inputs_ref = next(train_loader.__iter__())
        # inputs_ref = translate_inputs_p2t(inputs_pad)
@@ -59,8 +72,7 @@ def backward_test():
         losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 #        reprod_log_ref.add("output_%d"%(i), outputs_ref['outputs']['bn_features'].cpu().detach().numpy())
         reprod_log_ref.add("CEloss_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
-#        reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
-        print('Paddle:','CELoss',str(losses_ref['loss_cls']))
+      #  reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
 
         inputs_pad = translate_inputs_t2p(inputs_ref)
 
@@ -68,8 +80,7 @@ def backward_test():
         losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 #        reprod_log_pad.add("output_%d"%(i), outputs_pad['outputs']['bn_features'].cpu().detach().numpy())
         reprod_log_pad.add("CEloss_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
-#        reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
-        print('PyTorch:','CELoss',str(losses_ref['loss_cls']))
+     #   reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
 
         losses_ref['loss_cls'].backward()
         losses_pad['loss_cls'].backward()
@@ -85,13 +96,19 @@ def backward_test():
                     if 'ins_n' in key:
                         key = key.replace('scale', 'weight')
                     reprod_log_pad.add(key+'_grad', value.grad.cpu().detach().numpy())
-        '''
-        
-        optimizer_ref.step()
-        scheduler_ref.step()
+        '''    
+        optimizer_main_ref.step()
+        scheduler_main_ref.step()
 
-        optimizer_pad.step()
-        scheduler_pad.step()
+        optimizer_norm_ref.step()
+        scheduler_norm_ref.step()
+
+        optimizer_main_pad.step()
+        scheduler_main_pad.step()
+
+        optimizer_norm_pad.step()
+        scheduler_norm_pad.step()
+
         '''
         if i == 1:
             for key, value in model_ref.named_parameters():
@@ -103,9 +120,10 @@ def backward_test():
                         key = key.replace('scale', 'weight')
                     reprod_log_pad.add(key+'_value', value.cpu().detach().numpy())
         '''
-        optimizer_pad.clear_grad()
-        optimizer_ref.zero_grad()
-
+        optimizer_main_ref.zero_grad()
+        optimizer_main_pad.clear_grad()
+        optimizer_norm_ref.zero_grad()
+        optimizer_norm_pad.clear_grad()
 
     reprod_log_ref.save('./result/backward_ref.npy')
     reprod_log_pad.save('./result/backward_paddle.npy')

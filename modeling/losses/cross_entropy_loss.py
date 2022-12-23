@@ -18,11 +18,12 @@ def cross_entropy_loss(pred_class_logits, gt_classes, eps, alpha=0.2):
         smooth_param = alpha * soft_label[paddle.arange(soft_label.shape[0]), gt_classes].unsqueeze(1)
     log_probs = F.log_softmax(pred_class_logits, axis=1)
     with paddle.no_grad():
-
-        targets = paddle.ones_like(log_probs)
-        targets *= smooth_param / (num_classes - 1)
-        for i, idx in enumerate(gt_classes):
-            targets[i, idx] = 1 - smooth_param
+        targets = F.one_hot(gt_classes.cast(paddle.int64), num_classes=num_classes)
+        targets = F.label_smooth(targets, epsilon=num_classes/(num_classes-1) * smooth_param)
+        #targets = paddle.ones_like(log_probs)
+        #targets *= smooth_param / (num_classes - 1)
+        #for i, idx in enumerate(gt_classes):
+        #    targets[i, idx] = 1 - smooth_param
         
     loss = (-targets * log_probs).sum(axis=1)
 

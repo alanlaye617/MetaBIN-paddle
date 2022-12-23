@@ -14,7 +14,7 @@ def create_dataset(dataset_name, root='datasets'):
     elif dataset_name =='LiteData':
         return LiteData(root=root)
     else:
-        raise KeyError('Unknown dataset:', dataset_name)
+        raise NameError('Unknown dataset:', dataset_name)
 
 
 def create_sampler(train_set, batch_size, num_instance, num_workers,
@@ -201,11 +201,13 @@ def build_reid_train_loader(dataset_list, num_workers,
 
 def build_reid_test_loader(dataset_name, batch_size, num_workers=2, flag_test=True):
     test_transforms = build_transforms(is_train=False)
-    dataset = create_dataset(dataset_name) 
+    dataset = create_dataset(dataset_name)
     if flag_test:
         test_items = dataset.query + dataset.gallery
+        dataset.show_test()
     else:
         test_items = dataset.train
+        dataset.show_train()
     test_set = CommDataset(test_items, test_transforms, relabel=False)
     data_sampler = samplers.InferenceSampler(len(test_set))
     batch_sampler = paddle.io.BatchSampler(sampler=data_sampler, batch_size=batch_size, drop_last=False)

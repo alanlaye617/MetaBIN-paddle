@@ -88,10 +88,7 @@ def main(args):
         cfg.defrost()
         cfg.MODEL.BACKBONE.PRETRAIN = False
         model = Trainer.build_model(cfg)
-        torch.save(model.backbone.state_dict(), 'backbone.pth')
-        images = torch.Tensor((128, 3, 256, 128))
-        
-  #      torch.onnx.export(model, images, 'metabin.onnx')
+
         res = []
 
         if cfg.MODEL.WEIGHTS is not "":

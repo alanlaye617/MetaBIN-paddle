@@ -23,7 +23,7 @@ def forward_test():
     torch_path = "./model_weights/model.pth"
     paddle_path = "./model_weights/model.pdparams"
 
-    model_ref = build_ref_model(num_classes=10).cuda()
+    model_ref = build_ref_model(num_classes=10, resume=True).cuda()
     torch.save(model_ref.state_dict(), torch_path)
 #    model_ref.eval()
 
