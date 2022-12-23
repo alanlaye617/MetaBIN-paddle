@@ -16,6 +16,10 @@ from refs.fastreid.config import get_cfg
 from refs.fastreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch
 from refs.fastreid.evaluation import ReidEvaluator
 from refs.fastreid.solver import build_lr_scheduler, build_optimizer
+from refs.fastreid.utils.checkpoint import Checkpointer
+from refs.fastreid.utils.file_io import PathManager
+import numpy as np
+from PIL import Image, ImageOps
 import torch
 import numpy as np
 import random
@@ -71,7 +75,7 @@ def create_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True,
     cfg = setup(args)
     return cfg
 
-def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC']):
+def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC'], resume=False):
     cfg = create_cfg()
 
     # cfg.MODEL.WEIGHTS = "./logs/Visualize/u01/model_final.pth"
@@ -84,17 +88,63 @@ def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['M
     cfg.TEST.IMS_PER_BATCH = batch_size
     cfg.MODEL.BACKBONE.PRETRAIN = False
     trainer = Trainer(cfg)
-#    trainer.resume_or_load(resume=args.resume)
+    if resume:
+        trainer.resume_or_load(resume=resume)
     return trainer
 
-def build_ref_model(num_classes):
+def build_ref_model(num_classes, resume=False):
     cfg = create_cfg()
     cfg.defrost()
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
-    return Trainer.build_model(cfg)
+    model = Trainer.build_model(cfg)
+    if resume:
+        save_file = os.path.join(cfg.OUTPUT_DIR, "last_checkpoint")
+        with PathManager.open(save_file, "r") as f:
+            last_saved = f.read().strip()
+        path = os.path.join(cfg.OUTPUT_DIR, last_saved)
+        Checkpointer(model).load(path)
+    return model
 
 def build_ref_evaluator(num_query):
     cfg = create_cfg()
     cfg.defrost()
     return ReidEvaluator(cfg, num_query)
 
+
+
+from .path import PathManager
+
+def read_image_ref(file_name, format=None):
+    """
+    Read an image into the given format.
+    Will apply rotation and flipping if the image has such exif information.
+    Args:
+        file_name (str): image file path
+        format (str): one of the supported image modes in PIL, or "BGR"
+    Returns:
+        image (np.ndarray): an HWC image
+    """
+    with PathManager.open(file_name, "rb") as f:
+        image = Image.open(f)
+
+        # capture and ignore this bug: https://github.com/python-pillow/Pillow/issues/3973
+        try:
+            image = ImageOps.exif_transpose(image)
+        except Exception:
+            pass
+
+        if format is not None:
+            # PIL only supports RGB, so convert to RGB and flip channels over below
+            conversion_format = format
+            if format == "BGR":
+                conversion_format = "RGB"
+            image = image.convert(conversion_format)
+        image = np.asarray(image)
+        if format == "BGR":
+            # flip channels if needed
+            image = image[:, :, ::-1]
+        # PIL squeezes out the channel dimension for "L", so make it HWC
+        if format == "L":
+            image = np.expand_dims(image, -1)
+        image = Image.fromarray(image)
+        return image
