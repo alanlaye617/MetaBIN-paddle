@@ -1,9 +1,11 @@
-[2022/12/19 05:19:00] root INFO: CEloss_0: 
-[2022/12/19 05:19:00] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/19 05:19:00] root INFO: Tripletloss_0: 
-[2022/12/19 05:19:00] root INFO: 	mean diff: check passed: True, value: 0.0
-[2022/12/19 05:19:00] root INFO: CEloss_1: 
-[2022/12/19 05:19:00] root INFO: 	mean diff: check passed: False, value: 9.5367431640625e-06
-[2022/12/19 05:19:00] root INFO: Tripletloss_1: 
-[2022/12/19 05:19:00] root INFO: 	mean diff: check passed: False, value: 7.62939453125e-06
-[2022/12/19 05:19:00] root INFO: diff check failed
+[2022/12/23 14:42:12] root INFO: CEloss_0: 
+[2022/12/23 14:42:12] root INFO: 	mean diff: check passed: True, value: 4.76837158203125e-07
+[2022/12/23 14:42:12] root INFO: CEloss_1: 
+[2022/12/23 14:42:12] root INFO: 	mean diff: check passed: False, value: 1.9073486328125e-06
+[2022/12/23 14:42:12] root INFO: CEloss_2: 
+[2022/12/23 14:42:12] root INFO: 	mean diff: check passed: False, value: 0.05732154846191406
+[2022/12/23 14:42:12] root INFO: CEloss_3: 
+[2022/12/23 14:42:12] root INFO: 	mean diff: check passed: False, value: 0.04384899139404297
+[2022/12/23 14:42:12] root INFO: CEloss_4: 
+[2022/12/23 14:42:12] root INFO: 	mean diff: check passed: False, value: 0.22171783447265625
+[2022/12/23 14:42:12] root INFO: diff check failed
