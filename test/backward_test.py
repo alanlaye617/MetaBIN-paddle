@@ -5,9 +5,8 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight, build_ref_trainer, translate_inputs_t2p, translate_inputs_p2t
+from utils import translate_weight, build_ref_trainer, translate_inputs_t2p
 from modeling import Metalearning
-from data import build_train_loader_for_m_resnet
 from optim import build_lr_scheduler, build_optimizer
 from tqdm import tqdm
 
@@ -24,10 +23,10 @@ def backward_test():
     torch_path = "./model_weights/model.pth"
     paddle_path = "./model_weights/model.pdparams"
 
-    batch_size = 32
+    batch_size = 16
     base_lr = 0.01
     
-    trainer_ref = build_ref_trainer(batch_size=batch_size)
+    trainer_ref = build_ref_trainer(batch_size=batch_size, resume=True)
     train_loader = trainer_ref.data_loader
     model_ref = trainer_ref.model
     scheduler_main_ref = trainer_ref.scheduler_main
@@ -49,7 +48,7 @@ def backward_test():
             warmup_factor=scheduler_main_ref.warmup_factor,
             warmup_iters=scheduler_main_ref.warmup_iters,
             warmup_method=scheduler_main_ref.warmup_method,
-            last_epoch=-1,
+            last_epoch=scheduler_main_ref.last_epoch,
             verbose=False
             )
     scheduler_norm_pad = build_lr_scheduler(
@@ -58,12 +57,12 @@ def backward_test():
             warmup_factor=scheduler_norm_ref.warmup_factor,
             warmup_iters=scheduler_norm_ref.warmup_iters,
             warmup_method=scheduler_norm_ref.warmup_method,
-            last_epoch=-1,
+            last_epoch=scheduler_norm_ref.last_epoch,
             verbose=False
             )
 
-    optimizer_main_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_main_pad, flag='main')
-    optimizer_norm_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_norm_pad, flag='norm')
+    optimizer_main_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_main_pad, momentum=0.9, flag='main')
+    optimizer_norm_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_norm_pad, momentum=0, flag='norm')
 
     for i in tqdm(range(5)):
         inputs_ref = next(train_loader.__iter__())
@@ -100,14 +99,14 @@ def backward_test():
         optimizer_main_ref.step()
         scheduler_main_ref.step()
 
-        optimizer_norm_ref.step()
-        scheduler_norm_ref.step()
+    #    optimizer_norm_ref.step()
+    #    scheduler_norm_ref.step()
 
         optimizer_main_pad.step()
         scheduler_main_pad.step()
 
-        optimizer_norm_pad.step()
-        scheduler_norm_pad.step()
+    #    optimizer_norm_pad.step()
+    #    scheduler_norm_pad.step()
 
         '''
         if i == 1:

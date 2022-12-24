@@ -3,7 +3,7 @@ from paddle import optimizer
 from paddle.optimizer import Optimizer
 
 
-def build_optimizer(model, learning_rate, lr_scheduler, momentum=0.9, flag = None):
+def build_optimizer(model, base_lr, lr_scheduler, momentum, flag = None):
     params = []
     assert flag in ['main', 'norm'], NameError('Unknown flag'+str(flag))
     for key, value in model.named_parameters():
@@ -11,7 +11,7 @@ def build_optimizer(model, learning_rate, lr_scheduler, momentum=0.9, flag = Non
             print('.')
         if value.stop_gradient:
             continue
-        lr = learning_rate
+        lr = base_lr
         weight_decay = 0.0005
 
         if "bias" in key:
