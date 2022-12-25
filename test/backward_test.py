@@ -48,7 +48,7 @@ def backward_test():
             warmup_factor=scheduler_main_ref.warmup_factor,
             warmup_iters=scheduler_main_ref.warmup_iters,
             warmup_method=scheduler_main_ref.warmup_method,
-            last_epoch=scheduler_main_ref.last_epoch,
+            last_epoch=scheduler_main_ref.last_epoch-1,
             verbose=False
             )
     scheduler_norm_pad = build_lr_scheduler(
@@ -57,7 +57,7 @@ def backward_test():
             warmup_factor=scheduler_norm_ref.warmup_factor,
             warmup_iters=scheduler_norm_ref.warmup_iters,
             warmup_method=scheduler_norm_ref.warmup_method,
-            last_epoch=scheduler_norm_ref.last_epoch,
+            last_epoch=scheduler_norm_ref.last_epoch-1,
             verbose=False
             )
 

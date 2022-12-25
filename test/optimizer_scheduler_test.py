@@ -8,7 +8,7 @@ from tqdm import tqdm
 base_lr = 0.01
 gate_factor = 20
 
-trainer_ref = build_ref_trainer(batch_size=16)
+trainer_ref = build_ref_trainer(batch_size=16, resume=False)
 scheduler_main_ref = trainer_ref.scheduler_main
 scheduler_norm_ref = trainer_ref.scheduler_norm
 optimizer_main_ref = trainer_ref.optimizer_main
@@ -16,26 +16,25 @@ optimizer_norm_ref = trainer_ref.optimizer_norm
 
 model_pad = Metalearning(num_classes=751)
 scheduler_main_pad = build_lr_scheduler(
-        milestones=scheduler_main_ref.milestones,
-        gamma=scheduler_main_ref.gamma,
-        warmup_factor=scheduler_main_ref.warmup_factor,
-        warmup_iters=scheduler_main_ref.warmup_iters,
-        warmup_method=scheduler_main_ref.warmup_method,
-        last_epoch=-1,
-        verbose=False
-        )
+            milestones=scheduler_main_ref.milestones,
+            gamma=scheduler_main_ref.gamma,
+            warmup_factor=scheduler_main_ref.warmup_factor,
+            warmup_iters=scheduler_main_ref.warmup_iters,
+            warmup_method=scheduler_main_ref.warmup_method,
+            last_epoch=scheduler_main_ref.last_epoch-1,
+            verbose=False
+            )
 scheduler_norm_pad = build_lr_scheduler(
-        milestones=scheduler_norm_ref.milestones,
-        gamma=scheduler_norm_ref.gamma,
-        warmup_factor=scheduler_norm_ref.warmup_factor,
-        warmup_iters=scheduler_norm_ref.warmup_iters,
-        warmup_method=scheduler_norm_ref.warmup_method,
-        last_epoch=-1,
-        verbose=False
-        )
-
-optimizer_main_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_main_pad, flag='main')
-optimizer_norm_pad = build_optimizer(model_pad, learning_rate=base_lr, lr_scheduler=scheduler_norm_pad, flag='norm')
+            milestones=scheduler_norm_ref.milestones,
+            gamma=scheduler_norm_ref.gamma,
+            warmup_factor=scheduler_norm_ref.warmup_factor,
+            warmup_iters=scheduler_norm_ref.warmup_iters,
+            warmup_method=scheduler_norm_ref.warmup_method,
+            last_epoch=scheduler_norm_ref.last_epoch-1,
+            verbose=False
+            )
+optimizer_main_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_main_pad, momentum=0.9, flag='main')
+optimizer_norm_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_norm_pad, momentum=0, flag='norm')
 
 
 # optimitzer test    
