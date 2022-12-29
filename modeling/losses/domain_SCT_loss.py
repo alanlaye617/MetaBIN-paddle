@@ -23,13 +23,13 @@ def domain_SCT_loss(embedding, domain_labels, norm_feat, type):
         feat = embedding_all[i]
         center_feat = paddle.mean(feat, 0)
         if type == 'euclidean':
-            loss = paddle.mean(euclidean_dist(center_feat.view(1, -1), feat))
+            loss = paddle.mean(euclidean_dist(center_feat.unsqueeze(0), feat))
             loss_all.append(-loss)
         elif type == 'cosine':
-            loss = paddle.mean(cosine_dist(center_feat.view(1, -1), feat))
+            loss = paddle.mean(cosine_dist(center_feat.unsqueeze(0), feat))
             loss_all.append(-loss)
         elif type == 'cosine_sim':
-            loss = paddle.mean(cosine_sim(center_feat.view(1, -1), feat))
+            loss = paddle.mean(cosine_sim(center_feat.unsqueeze(0), feat))
             loss_all.append(loss)
 
     loss_all = paddle.mean(paddle.stack(loss_all))

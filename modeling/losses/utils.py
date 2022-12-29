@@ -20,19 +20,11 @@ def euclidean_dist(x, y):
     dist = dist.clip(min=1e-12).sqrt()  # for numerical stability
     return dist
 
-def cosine_dist(x, y):
-    bs1, bs2 = x.shape[0], y.shape[0]
-    frac_up = paddle.matmul(x, y.transpose(0, 1))
-    frac_down = (paddle.sqrt(paddle.sum(paddle.pow(x, 2), 1))).view(bs1, 1).repeat(1, bs2) * \
-                (paddle.sqrt(paddle.sum(paddle.pow(y, 2), 1))).view(1, bs2).repeat(bs1, 1)
-    cosine = frac_up / frac_down
-    return 1 - cosine
-
 def cosine_sim(x, y):
     bs1, bs2 = x.shape[0], y.shape[0]
-    frac_up = paddle.matmul(x, y.transpose(0, 1))
-    frac_down = (paddle.sqrt(paddle.sum(paddle.pow(x, 2), 1))).view(bs1, 1).repeat(1, bs2) * \
-                (paddle.sqrt(paddle.sum(paddle.pow(y, 2), 1))).view(1, bs2).repeat(bs1, 1)
+    frac_up = paddle.matmul(x, y.transpose((1, 0)))
+    frac_down = (paddle.sqrt(paddle.sum(paddle.pow(x, 2), 1))).unsqueeze(-1) * \
+                (paddle.sqrt(paddle.sum(paddle.pow(y, 2), 1))).unsqueeze(0)
     cosine = frac_up / frac_down
     return cosine
 

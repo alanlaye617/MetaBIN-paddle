@@ -35,7 +35,7 @@ scheduler_norm_pad = build_lr_scheduler(
             )
 optimizer_main_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_main_pad, momentum=0.9, flag='main')
 optimizer_norm_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_norm_pad, momentum=0, flag='norm')
-
+trainer_ref.train()
 
 # optimitzer test    
 dict_ref = {k['name']:{'lr': k['initial_lr'], 'weight_decay': k['weight_decay']}for k in optimizer_main_ref.param_groups}

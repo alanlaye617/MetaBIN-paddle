@@ -4,75 +4,22 @@ import copy
 from collections import OrderedDict
 import paddle
 from paddle import optimizer
+#from paddle.optimizer.lr import LRScheduler
 import numpy as np
 import logging
 import weakref
 import time
 import math
 
-from data import build_test_loader_for_m_resnet, build_train_loader_for_m_resnet, build_reid_train_loader
+from evaluation import ReidEvaluator
+from data import build_test_loader_for_m_resnet, build_train_loader_for_m_resnet, build_reid_test_loader
 from modeling import Metalearning
 from optim import build_lr_scheduler, build_optimizer
-from .events import EventStorage
+from utils.events import EventStorage
+from .hooks import HookBase, LRScheduler
+
 
 logger = logging.getLogger(__name__)
-
-
-class HookBase:
-    """
-    Base class for hooks that can be registered with :class:`TrainerBase`.
-    Each hook can implement 4 methods. The way they are called is demonstrated
-    in the following snippet:
-    .. code-block:: python
-        hook.before_train()
-        for iter in range(start_iter, max_iter):
-            hook.before_step()
-            trainer.run_step()
-            hook.after_step()
-        hook.after_train()
-    Notes:
-        1. In the hook method, users can access `self.trainer` to access more
-           properties about the context (e.g., current iteration).
-        2. A hook that does something in :meth:`before_step` can often be
-           implemented equivalently in :meth:`after_step`.
-           If the hook takes non-trivial time, it is strongly recommended to
-           implement the hook in :meth:`after_step` instead of :meth:`before_step`.
-           The convention is that :meth:`before_step` should only take negligible time.
-           Following this convention will allow hooks that do care about the difference
-           between :meth:`before_step` and :meth:`after_step` (e.g., timer) to
-           function properly.
-    Attributes:
-        trainer: A weak reference to the trainer object. Set by the trainer when the hook is
-            registered.
-    """
-
-    def before_train(self):
-        """
-        Called before the first iteration.
-        """
-        pass
-
-    def after_train(self):
-        """
-        Called after the last iteration.
-        """
-        pass
-
-    def before_step(self):
-        """
-        Called before each iteration.
-        """
-        pass
-
-    def after_step(self):
-        """
-        Called after each iteration.
-        """
-        pass
-
-
-
-
 
 class Trainer(object):
     def __init__(self, train_batch_size=None, mode='M-ResNet') -> None:
@@ -83,7 +30,8 @@ class Trainer(object):
 
         self.data_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(
             dataset_list=self.cfg['DATASETS']['NAMES'],
-            batch_size=self.cfg['SOLVER']['IMS_PER_BATCH'], 
+            batch_size=self.cfg['SOLVER']['IMS_PER_BATCH'],
+            num_instance=self.cfg['DATALOADER']['NUM_INSTANCE'],
             world_size=1)
 
         self.cfg['META']['DATA']['NUM_DOMAINS'] = num_domains
@@ -92,15 +40,15 @@ class Trainer(object):
         num_classes = self.data_loader.dataset.num_classes
         self.model = self.build_model(num_classes)
 
-        scheduler_main = self.build_lr_scheduler(
+        self.scheduler_main = self.build_lr_scheduler(
             milestones=self.cfg['SOLVER']['STEPS'], 
-            gamma=self.cfg['gamma'],
+            gamma=self.cfg['SOLVER']['GAMMA'],
             warmup_factor=self.cfg['SOLVER']['WARMUP_FACTOR'],
             warmup_iters=self.cfg['SOLVER']['WARMUP_ITERS'],
             warmup_method=self.cfg['SOLVER']['WARMUP_METHOD']
             )
 
-        scheduler_norm = self.build_lr_scheduler(
+        self.scheduler_norm = self.build_lr_scheduler(
             milestones=[100000000,1000000000],
             gamma=1.0,
             warmup_factor=self.cfg['SOLVER']['WARMUP_FACTOR'],
@@ -111,14 +59,14 @@ class Trainer(object):
         self.optimizer_main = self.build_optimizer(
             model=self.model, 
             base_lr=self.cfg['SOLVER']['BASE_LR'],
-            lr_scheduler=scheduler_main,
+            lr_scheduler=self.scheduler_main,
             momentum=self.cfg['SOLVER']['MOMENTUM'],
             flag='main')
 
         self.optimizer_norm = self.build_optimizer(
             model=self.model, 
             base_lr=self.cfg['SOLVER']['BASE_LR'],
-            lr_scheduler=scheduler_norm,
+            lr_scheduler=self.scheduler_norm,
             momentum=self.cfg['SOLVER']['MOMENTUM_NORM'],
             flag='norm')        
         
@@ -213,12 +161,12 @@ class Trainer(object):
                     num_step_down = 1
 
                 # TODO
-                self.cyclic_optimizer = optimizer.SGD([Variable(torch.zeros(1), requires_grad=False)], lr=0.1)
-
+                #self.cyclic_optimizer = optimizer.SGD([Variable(paddle.zeros(1), requires_grad=False)], lr=0.1)
+                #?
                 self.cyclic_scheduler = optimizer.lr.CyclicLR(
                    # optimizer=self.cyclic_optimizer,
-                    base_learning_rate= meta_param['update_cyclic_middle_lr'] / meta_param['update_cyclic_ratio'],
-                    max_learning_rate= meta_param['update_cyclic_middle_lr'] * meta_param['update_cyclic_ratio'],
+                    base_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] / meta_param['update_cyclic_ratio'],
+                    max_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] * meta_param['update_cyclic_ratio'],
                     step_size_up = num_step_up,
                     step_size_down = num_step_down,
                 )
@@ -229,7 +177,7 @@ class Trainer(object):
         self.meta_param = meta_param
         if self.cfg['SOLVER']['AMP']:
             self.scaler = paddle.amp.GradScaler()
-            # self.scaler = torch.cuda.amp.GradScaler()
+            # self.scaler = paddle.cuda.amp.GradScaler()
         else:
             self.scaler = None
 
@@ -306,7 +254,7 @@ class Trainer(object):
                     for i, g in enumerate(self.optimizer_norm._param_groups):
                         if val['raw_name'] + '.gate' == g['name']:
                             self.all_layers[name]['g_param_idx'] = i
-            #TODO logger.info('[[Allocate compute_meta_params]]')
+            logger.info('[[Allocate compute_meta_params]]')
             new_object_name_params = 'compute_meta_params'
             new_object_name_gates = 'compute_meta_gates'
             if self.meta_param['meta_all_params']: # allocate all params
@@ -384,31 +332,6 @@ class Trainer(object):
                 logger.info('{} is in the {}'.format(update_name, name))
                 exec('self.model.{}.{} = {}'.format(name, new_object_name_gates, True))
 
-            # logger.info('[[Exceptions 2]]')
-            # for name, val in self.all_layers.items():
-            #     if 'downsample[0]' in name:
-            #         name2 = '.'.join(name.split('.')[:-1]) + '.conv1'
-            #         exec('self.model.{}.{} = self.model.{}.{}'.format(
-            #             name, new_object_name_params, name2, new_object_name_params))
-            #         logger.info('copy [{}.{}] <- [{}.{}]'.format(
-            #             name, new_object_name_params, name2, new_object_name_params))
-            #     if 'downsample[1]' in name:
-            #         name2 = '.'.join(name.split('.')[:-1]) + '.bn1'
-            #         exec('self.model.{}.{} = self.model.{}.{}'.format(
-            #             name, new_object_name_params, name2, new_object_name_params))
-            #         logger.info('copy [{}.{}] <- [{}.{}]'.format(
-            #             name, new_object_name_params, name2, new_object_name_params))
-            #         exec('self.model.{}.{} = self.model.{}.{}'.format(
-            #             name, new_object_name_gates, name2, new_object_name_gates))
-            #         logger.info('copy [{}.{}] <- [{}.{}]'.format(
-            #             name, new_object_name_gates, name2, new_object_name_gates))
-
-            # layer4.0.downsample.0.weight
-            # layer4.0.downsample.1.{running_mean, running_var, weight, bias}
-            #
-            # layer4.0.downsample.conv1.weight
-            # layer4.0.downsample.bn1.{running_mean, running_var, weight, bias}
-
             for name, val in self.all_layers.items():
                 exec("val['{}'] = self.model.{}.{}".format(new_object_name_params, name, new_object_name_params))
                 exec("val['{}'] = self.model.{}.{}".format(new_object_name_gates, name, new_object_name_gates))
@@ -418,10 +341,12 @@ class Trainer(object):
             for name, val in self.all_layers.items():
                 logger.info('Name: {}, meta_param: {}, meta_gate: {}'.format(name, val[new_object_name_params], val[new_object_name_gates]))
         else:
+            '''
             find_group = ['layer1_conv_weight', 'layer1_conv_bias',
                           'layer1_bn_weight', 'layer1_bn_bias',
                           'classifier_fc_weight', 'classifier_fc_bias',
                           'classifier_norm_weight', 'classifier_norm_bias',]
+            '''
             find_group = ['layer1_conv_weight', 'layer1_conv_bias',
                           'layer1_bn_weight', 'layer1_bn_bias',
                           'layer1_bn_mean_weight', 'layer1_bn_var_weight',
@@ -444,15 +369,14 @@ class Trainer(object):
         #        scheduler_norm=self.scheduler_norm,
         #    )
         self.start_iter = 0
-        self.max_iter = self.cfg['max_iter']
+        self.max_iter = self.cfg['SOLVER']['MAX_ITER']
         self.register_hooks(self.build_hooks())
 
-
-    @classmethod
-    def get_cfg(cls, mode, root='./configs'):
+    @staticmethod
+    def get_cfg(mode, root='./configs'):
         path = os.path.join(root, mode+".yaml")
         with open(path, encoding="UTF-8") as cfg_file:
-            cfg = yaml.load(cfg_file)
+            cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
         return cfg
 
     @classmethod
@@ -471,14 +395,12 @@ class Trainer(object):
         return Metalearning(num_classes=num_classes)
 
     @classmethod
-    def build_test_loader(cls, dataset_name, batch_size):
-        # TODO
-        return build_test_loader_for_m_resnet()        
+    def build_test_loader(cls, dataset_name, batch_size, num_workers=2, flag_test=True):
+        return build_reid_test_loader(dataset_name, batch_size=batch_size, flag_test=flag_test, num_workers=num_workers)        
 
     @classmethod
     def build_evaluator(cls, num_query, output_dir=None):
-        # TODO
-        return 
+        return ReidEvaluator(num_query=num_query)
 
 
     def register_hooks(self, hooks):
@@ -499,8 +421,15 @@ class Trainer(object):
         self._hooks.extend(hooks)
 
     def build_hooks(self):
-        # TODO
-        pass
+        logger = logging.getLogger(__name__)
+        ret = [
+           # hooks.IterationTimer(),
+            LRScheduler(self.optimizer_main,
+                        self.scheduler_main,
+                        self.optimizer_norm,
+                        self.scheduler_norm),
+        ]
+        return ret
 
     def resume_or_load(self, resume=True):
         # TODO
@@ -591,7 +520,6 @@ class Trainer(object):
     def train(self):
         start_iter = self.start_iter
         max_iter = self.max_iter
-        # TODO
         logger = logging.getLogger(__name__)
         logger.info("Starting training from iteration {}".format(start_iter))
 
@@ -604,7 +532,7 @@ class Trainer(object):
             for self.iter in range(start_iter, max_iter):
                 self.before_step()
                 if self.cfg['META']['DATA']['NAMES'] == '': # general learning (not meta-learning)
-                    self.run_step()
+                    self.run_step() # unused
                 else: # our model (MAML-based)
                     self.cnt = 0
                     self.data_time_all = 0.0
@@ -648,71 +576,7 @@ class Trainer(object):
     # general learning (not meta-learning, not our model)
     #####################################################################
     def run_step(self):
-        # initial setting
-        # self.optimizer.zero_grad()
-        # TODO
-        start = time.perf_counter()
-        assert self.model.training, "[SimpleTrainer] model was changed to eval mode!"
-        metrics_dict = dict()
-        # TODO
-        #self.print_selected_optimizer('0) start', self.idx_group, self.optimizer_main, True)
-        #self.print_selected_optimizer('0) start', [0, -1], self.optimizer_norm, True)
-
-        # Load dataset
-        data, data_time = self.get_data(self._data_loader_iter, list_sample = None)
-
-        # Training (forward & backward)
-        opt = self.opt_setting('basic') # option
-        opt['domains'] = data['others']['domains']
-        losses, loss_dict = self.basic_forward(data, self.model, opt) # forward
-        self.basic_backward(losses, self.optimizer_main, retain_graph = True) # backward
-        self.basic_backward(losses, self.optimizer_norm) # backward
-
-        # Post-processing
-        for name, val in loss_dict.items(): metrics_dict[name] = val
-        metrics_dict["data_time"] = data_time
-        self._write_metrics(metrics_dict)
-
-
-        with paddle.no_grad():
-            if len(self.bin_names) > 0 and (self.iter + 1) % (self.cfg['SOLVER']['WRITE_PERIOD_BIN']) == 0:
-                start = time.perf_counter()
-                all_gate_dict = dict()
-                for j in range(len(self.bin_names)):
-                    name = '_'.join(self.bin_names[j].split('.')[1:]).\
-                        replace('bn', 'b').replace('gate','g').replace('layer', 'l').replace('conv','c')
-                    val_mean = paddle.mean(self.bin_gates[j]).tolist()
-                    val_std = paddle.std(self.bin_gates[j]).tolist()
-                    val_hist = paddle.histogram(self.bin_gates[j], bins=20, min=0.0, max=1.0).int()
-                    all_gate_dict[name + '_mean']= val_mean
-                    all_gate_dict[name + '_std']= val_std
-                    for x in paddle.nonzero(val_hist):
-                        all_gate_dict[name + '_hist' + str(x[0].tolist())] = val_hist[x[0]].tolist()
-                    # all_gate_dict['hist_' + name]= str(val_hist.tolist()).replace(' ','')
-                self.storage.put_scalars(**all_gate_dict, smoothing_hint=False)
-                # print(time.perf_counter() - start)
-
-        # print(time.perf_counter() - start)
-        # if self.iter % (self.cfg.SOLVER.WRITE_PERIOD_PARAM * self.cfg.SOLVER.WRITE_PERIOD) == 0:
-        #     self.logger_parameter_info(self.model)
-
-    #####################################################################
-    # backward
-    #####################################################################
-    def basic_backward(self, losses, optimizer, retain_graph = False):
-        if (losses != None) and (optimizer != None):
-            optimizer.clear_grad()
-            if self.scaler == None: # no AMP
-                losses.backward(retain_graph = retain_graph)
-                optimizer.step()
-            else: # with AMP(automatic mixed precision)
-                self.scaler.scale(losses).backward(retain_graph = retain_graph)
-                # self.scaler.unscale_(optimizer)
-                # torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
-                self.scaler.step(optimizer)
-                self.scaler.update()
-            for p in self.bin_gates:
-                p = p.clip(min=0, max=1)
+        pass
 
     #####################################################################
     # forward
@@ -720,7 +584,7 @@ class Trainer(object):
     def basic_forward(self, data, model, opt = None):
         #model = model.module if isinstance(model, DistributedDataParallel) else model
         if data != None:
-            with paddle.amp.auto_cast(enabled=self.scaler != None):
+            with paddle.amp.auto_cast(enable=self.scaler != None):
                 outs = model(data, opt)
                 loss_dict = model.losses(outs, opt)
                 losses = sum(loss_dict.values())
@@ -730,6 +594,24 @@ class Trainer(object):
             loss_dict = dict()
         # print(loss_dict)
         return losses, loss_dict
+
+    #####################################################################
+    # backward
+    #####################################################################
+    def basic_backward(self, losses, optimizer, retain_graph = False):
+        if (losses is not None) and (optimizer is not None):
+            optimizer.clear_grad()
+            if self.scaler == None: # no AMP
+                losses.backward(retain_graph = retain_graph)
+                optimizer.step()
+            else: # with AMP(automatic mixed precision)
+                self.scaler.scale(losses).backward(retain_graph = retain_graph)
+                # self.scaler.unscale_(optimizer)
+                # paddle.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
+                self.scaler.step(optimizer)
+                self.scaler.update()
+            for p in self.bin_gates:
+                p = p.clip(min=0, max=1)
 
     #####################################################################
     # base model updates (not meta-learning)
@@ -750,8 +632,10 @@ class Trainer(object):
 
         data, data_time = self.get_data(self._data_loader_iter, list_sample = None)
         self.data_time_all += data_time
-        opt['domains'] = data['others']['domains']
+        #!opt['domains'] = data['others']['domains']
+        opt['domains'] = data['domains']
         losses, loss_dict = self.basic_forward(data, self.model, opt) # forward
+        
         if self.meta_param['meta_all_params']:
             self.basic_backward(losses, self.optimizer_norm, retain_graph = True) #
         self.basic_backward(losses, self.optimizer_main) # backward
@@ -765,13 +649,13 @@ class Trainer(object):
 
         # if self.meta_param['flag_manual_zero_grad'] != 'hold':
         #     self.manual_zero_grad(self.model)
-        #     self.optimizer_main.zero_grad()
+        #     self.optimizer_main.clear_grad()
         # if self.meta_param['flag_manual_memory_empty']:
-        # torch.cuda.empty_cache()
+        # paddle.cuda.empty_cache()
         if self.iter == 0:
             if self.optimizer_norm != None:
-                self.optimizer_norm.zero_grad()
-        if self.meta_param['sync']: torch.cuda.synchronize()
+                self.optimizer_norm.clear_grad()
+        #if self.meta_param['sync']: paddle.cuda.synchronize()
 
     #####################################################################
     # meta-learning (update balancing parameters)
@@ -781,7 +665,7 @@ class Trainer(object):
 
         # start = time.perf_counter()
         # Meta-learning
-        if self.meta_param['main_zero_grad']: self.optimizer_main.zero_grad()
+        if self.meta_param['main_zero_grad']: self.optimizer_main.clear_grad()
 
         if self.cnt == 0:
             self.print_selected_optimizer('2) before meta-train', self.idx_group, self.optimizer_main, self.meta_param['detail_mode'])
@@ -803,8 +687,7 @@ class Trainer(object):
             name_loss_mtrain = '2)'
             opt = self.opt_setting('mtrain')
 
-            # not used
-            if self.meta_param['one_loss_for_iter']:
+            if self.meta_param['one_loss_for_iter']: # not used
                 num_losses = len(opt['loss'])
                 num_rem = self.global_meta_cnt % num_losses
                 if self.meta_param['one_loss_order'] == 'forward':
@@ -822,11 +705,12 @@ class Trainer(object):
                     self.data_time_all += data_time
                     data_mtrain = data[0]
                     data_mtest = data[1]
-                else:
+                else:   # not used
                     data_mtrain, data_time = self.get_data(self._data_loader_iter_mtrain, list_sample=list_mtrain)
                     self.data_time_all += data_time
                     data_mtest, data_time = self.get_data(self._data_loader_iter_mtrain, list_sample=list_mtest)
                     self.data_time_all += data_time
+            '''  not used 
             else:
                 if self.meta_param['synth_data'] != 'none' and self.meta_param['synth_method'] != 'none':
 
@@ -887,23 +771,27 @@ class Trainer(object):
                     self.data_time_all += data_time
                     data_mtest, data_time = self.get_data(self._data_loader_iter_mtest, list_sample = list_mtest)
                     self.data_time_all += data_time
+                    '''
 
             # import matplotlib.pyplot as plt
             # plt.imshow(data_mtrain['images'][0].permute(1, 2, 0)/255)
             # plt.show()
 
-            # not used
             if (self.meta_param['synth_grad'] == 'none') or (self.meta_param['synth_grad'] == 'reverse'):
+                
+                '''?
                 if self.meta_param['freeze_gradient_meta']:
                     self.grad_setting('mtrain_both')
-                opt['domains'] = data_mtrain['others']['domains']
+                '''
+                opt['domains'] = data_mtrain['domains']
                 losses, loss_dict = self.basic_forward(data_mtrain, self.model, opt) # forward
                 mtrain_losses.append(losses)
 
                 if self.cnt == 0:
                     for name, val in loss_dict.items():
                         t = name_loss_mtrain + name
-                        self.metrics_dict[t] = self.metrics_dict[t] + val if t in self.metrics_dict.keys() else val
+                        self.metrics_dict[t] = self.metrics_dict.get(t, 0) + val
+                        #self.metrics_dict[t] = self.metrics_dict[t] + val if t in self.metrics_dict.keys() else val
             else:
                 losses = []
 
@@ -916,9 +804,9 @@ class Trainer(object):
             print_grad_mean_list = list()
             print_grad_prob_list = list()
             if self.meta_param['print_grad'] and len(self.bin_names) > 0 \
-                    and (self.iter + 1) % (self.cfg.SOLVER.WRITE_PERIOD_BIN) == 0:
+                    and (self.iter + 1) % (self.cfg['SOLVER']['WRITE_PERIOD_BIN']) == 0:
                 if self.cnt == 0:
-                    with torch.no_grad():
+                    with paddle.no_grad():
                         if len(opt['grad_params'])>0:
                             grad_cnt = 0
                             for grad_values in opt['grad_params']:
@@ -929,7 +817,7 @@ class Trainer(object):
 
 
             # self.grad_setting('mtrain_both') # melt both meta_compute and meta_update parameters
-            opt['domains'] = data_mtest['others']['domains']
+            opt['domains'] = data_mtest['domains']
             losses, loss_dict = self.basic_forward(data_mtest, self.model, opt) # forward
 
             mtest_losses.append(losses)
@@ -946,9 +834,9 @@ class Trainer(object):
                 mtest_losses = mtest_losses[0]
         else:
             if len(mtrain_losses) > 0:
-                mtrain_losses = torch.sum(torch.stack(mtrain_losses))
+                mtrain_losses = paddle.sum(paddle.stack(mtrain_losses))
             if len(mtest_losses) > 0:
-                mtest_losses = torch.sum(torch.stack(mtest_losses))
+                mtest_losses = paddle.sum(paddle.stack(mtest_losses))
 
         if self.meta_param['loss_combined']:
             total_losses = self.meta_param['loss_weight'] * mtrain_losses + mtest_losses
@@ -962,41 +850,42 @@ class Trainer(object):
 
         # if self.meta_param['flag_manual_zero_grad'] != 'hold':
         #     self.manual_zero_grad(self.model)
-        #     self.optimizer_norm.zero_grad()
+        #     self.optimizer_norm.clear_grad()
         # if self.meta_param['flag_manual_memory_empty']:
-        #     torch.cuda.empty_cache()
-        if self.meta_param['sync']: torch.cuda.synchronize()
+        #     paddle.cuda.empty_cache()
+
+        #?if self.meta_param['sync']: paddle.cuda.synchronize()
 
         if self.cnt == 0:
             self.print_selected_optimizer('2) after meta-learning', self.idx_group, self.optimizer_main, self.meta_param['detail_mode'])
             self.print_selected_optimizer('2) after meta-learning', self.idx_group_norm, self.optimizer_norm, self.meta_param['detail_mode'])
 
-        self.optimizer_main.zero_grad()
+        self.optimizer_main.clear_grad()
         if self.optimizer_norm != None:
-            self.optimizer_norm.zero_grad()
+            self.optimizer_norm.clear_grad()
 
-        if self.meta_param['freeze_gradient_meta']:
-            self.grad_requires_recover(model=self.model, ori_grad=self.initial_requires_grad)
+        #if self.meta_param['freeze_gradient_meta']:
+        #    self.grad_requires_recover(model=self.model, ori_grad=self.initial_requires_grad)
 
         if self.cnt == 0:
             self.metrics_dict["data_time"] = self.data_time_all
             self._write_metrics(self.metrics_dict)
-
-        with torch.no_grad(): # for save balancing parameters
+        '''TODO
+        with paddle.no_grad(): # for save balancing parameters
             if self.cnt == 0:
-                if len(self.bin_names) > 0 and (self.iter + 1) % (self.cfg.SOLVER.WRITE_PERIOD_BIN) == 0:
+                if len(self.bin_names) > 0 and (self.iter + 1) % (self.cfg['SOLVER']['WRITE_PERIOD_BIN']) == 0:
                     start = time.perf_counter()
                     all_gate_dict = dict()
                     cnt_print = 0
                     for j in range(len(self.bin_names)):
                         name = '_'.join(self.bin_names[j].split('.')[1:]).\
                             replace('bn', 'b').replace('gate','g').replace('layer', 'l').replace('conv','c')
-                        val_mean = torch.mean(self.bin_gates[j].data).tolist()
-                        val_std = torch.std(self.bin_gates[j].data).tolist()
-                        val_hist = torch.histc(self.bin_gates[j].data, bins=20, min=0.0, max=1.0).int()
+                        val_mean = paddle.mean(self.bin_gates[j].data).tolist()
+                        val_std = paddle.std(self.bin_gates[j].data).tolist()
+                        val_hist = paddle.histc(self.bin_gates[j].data, bins=20, min=0.0, max=1.0).int()
                         all_gate_dict[name + '_mean']= val_mean
                         all_gate_dict[name + '_std']= val_std
-                        for x in torch.nonzero(val_hist.data):
+                        for x in paddle.nonzero(val_hist.data):
                             all_gate_dict[name + '_hist' + str(x[0].tolist())] = val_hist[x[0]].tolist()
                         # all_gate_dict['hist_' + name]= str(val_hist.tolist()).replace(' ','')
                         if self.meta_param['print_grad']:
@@ -1007,7 +896,7 @@ class Trainer(object):
                         cnt_print += 1
 
                     self.storage.put_scalars(**all_gate_dict, smoothing_hint=False)
-
+        '''
 
                 # print(time.perf_counter() - start)
 
@@ -1031,17 +920,19 @@ class Trainer(object):
                 else:
                     data = next(data_loader_iter)
                     if list_sample != None:
-                        domain_idx = data['others']['domains']
+                        domain_idx = data['domains']
                         cnt = 0
                         for sample in list_sample:
                             if cnt == 0:
                                 t_logical_domain = domain_idx == sample
                             else:
-                                t_logical_domain += domain_idx == sample
+                                #t_logical_domain += domain_idx == sample    # questionable
+                                t_logical_domain = paddle.logical_or(t_logical_domain, domain_idx == sample)
                             cnt += 1
 
                         # data1
-                        if int(sum(t_logical_domain)) == 0:
+                        #if int(sum(t_logical_domain)) == 0:
+                        if not any(t_logical_domain):
                             data = None
                             logger.info('No data including list_domain')
                         else:
@@ -1060,7 +951,8 @@ class Trainer(object):
                         # data2 (if opt == 'all')
                         if opt == 'all':
                             t_logical_domain_reversed = t_logical_domain == False
-                            if int(sum(t_logical_domain_reversed)) == 0:
+                            if not any(t_logical_domain_reversed):
+                            #if int(sum(t_logical_domain_reversed)) == 0:
                                 data2 = None
                                 logger.info('No data including list_domain')
                             else:
@@ -1121,7 +1013,7 @@ class Trainer(object):
                 data1[name].extend(value)
         return data1
     
-    def _write_metrics(self):
+    def _write_metrics(self, m):
         # TODO
         pass
 
@@ -1150,8 +1042,19 @@ class Trainer(object):
                     if paddle.sum(param.grad) > 0:
                         param.grad.zero_()
         # return model
+    
+    @staticmethod
+    def get_curr_lr(optimizer, param_idx):
+        if isinstance(optimizer._learning_rate, paddle.optimizer.lr.LRScheduler):
+            lr = optimizer._learning_rate.last_lr * optimizer._param_groups[param_idx]['learning_rate']
+        else:
+            lr = optimizer._learning_rate * optimizer._param_groups[param_idx]['learning_rate']
+        return lr
 
-
+    @staticmethod
+    def get_curr_scale(scaler):
+        # TODO
+        return 1.0
     #####################################################################
     # set options (basic, mtrain, mtest) important!
     #####################################################################
@@ -1165,13 +1068,13 @@ class Trainer(object):
                 opt['type_running_stats'] = self.meta_param['type_running_stats_init']
             except:
                 opt['type_running_stats'] = 'general'
-            opt['each_domain'] = self.cfg.MODEL.NORM.EACH_DOMAIN_BASIC
+            opt['each_domain'] = self.cfg['MODEL']['NORM']['EACH_DOMAIN_BASIC']
         elif flag == 'mtrain':
             opt = {}
             opt['param_update'] = False
             opt['loss'] = self.meta_param['loss_name_mtrain']
             opt['type_running_stats'] = self.meta_param['type_running_stats_mtrain']
-            opt['each_domain'] = self.cfg.MODEL.NORM.EACH_DOMAIN_MTRAIN
+            opt['each_domain'] = self.cfg['MODEL']['NORM']['EACH_DOMAIN_MTRAIN']
         elif flag == 'mtest':
             opt = {}
             opt['param_update'] = True
@@ -1182,14 +1085,16 @@ class Trainer(object):
             # opt['zero_grad'] = self.meta_param['zero_grad']
             opt['type_running_stats'] = self.meta_param['type_running_stats_mtest']
             opt['inner_clamp'] = self.meta_param['inner_clamp']
-            opt['each_domain'] = self.cfg.MODEL.NORM.EACH_DOMAIN_MTEST
+            opt['each_domain'] = self.cfg['MODEL']['NORM']['EACH_DOMAIN_MTEST']
 
             # self.meta_param['update_cyclic_ratio']
             # self.meta_param['update_cyclic_period']
             if self.meta_param['update_ratio'] == 0.0:
                 if self.meta_param['update_cyclic_new']: # cyclic update
                     self.cyclic_scheduler.step()
-                    meta_ratio = self.cyclic_optimizer.param_groups[0]['lr']
+                    # ! meta_ratio = self.cyclic_optimizer.param_groups[0]['lr']
+                    meta_ratio = self.cyclic_scheduler.get_lr()
+                '''
                 else: # not used (old version)
                     one_period = self.meta_param['iters_per_epoch'] / self.meta_param['update_cyclic_period']
                     b = math.log10(self.meta_param['update_cyclic_ratio'])
@@ -1208,29 +1113,36 @@ class Trainer(object):
                         rem_val -= one_period/4.0*3.0
                         meta_ratio = - b + a * rem_val # y = -b + ax
                     meta_ratio = pow(10, meta_ratio)
+                '''
             else:
                 meta_ratio = self.meta_param['update_ratio']
 
             # allocate stepsize
             for name, val in self.all_layers.items(): # compute stepsize
                 if self.all_layers[name]['w_param_idx'] != None:
+                    self.all_layers[name]['w_step_size'] = self.get_curr_lr(self.optimizer_main, self.all_layers[name]['w_param_idx']) * meta_ratio
+                    '''
                     self.all_layers[name]['w_step_size'] = \
-                        self.optimizer_main.param_groups[self.all_layers[name]['w_param_idx']]["lr"]\
-                        * meta_ratio
+                        self.optimizer_main.param_groups[self.all_layers[name]['w_param_idx']]["lr"] * meta_ratio
+                    '''
                 else:
                     self.all_layers[name]['b_step_size'] = None
 
                 if self.all_layers[name]['b_param_idx'] != None:
+                    self.all_layers[name]['b_step_size'] = self.get_curr_lr(self.optimizer_main, self.all_layers[name]['b_param_idx']) * meta_ratio
+                    '''
                     self.all_layers[name]['b_step_size'] = \
-                        self.optimizer_main.param_groups[self.all_layers[name]['b_param_idx']]["lr"]\
-                        * meta_ratio
+                        self.optimizer_main.param_groups[self.all_layers[name]['b_param_idx']]["lr"] * meta_ratio
+                    '''
                 else:
                     self.all_layers[name]['b_step_size'] = None
 
                 if self.all_layers[name]['g_param_idx'] != None:
+                    self.all_layers[name]['g_step_size'] = self.get_curr_lr(self.optimizer_norm, self.all_layers[name]['g_param_idx']) * meta_ratio
+                    '''
                     self.all_layers[name]['g_step_size'] = \
-                        self.optimizer_norm.param_groups[self.all_layers[name]['g_param_idx']]["lr"]\
-                        * meta_ratio
+                        self.optimizer_norm.param_groups[self.all_layers[name]['g_param_idx']]["lr"] * meta_ratio
+                    '''
                 else:
                     self.all_layers[name]['g_step_size'] = None
 
@@ -1247,14 +1159,14 @@ class Trainer(object):
             if opt['auto_grad_outside']: # compute gradient using meta-train loss
                 # outer
                 names_weights_copy = dict()
-                if self.meta_param['momentum_init_grad'] > 0.0:
-                    names_grads_copy = list()
+                #?if self.meta_param['momentum_init_grad'] > 0.0:
+                #?    names_grads_copy = list()
                 for name, param in self.model.named_parameters():
                     if self.meta_param['meta_all_params']:
-                        if param.requires_grad:
+                        if not param.stop_gradient:
                             names_weights_copy['self.model.' + name] = param
-                            if self.meta_param['momentum_init_grad'] > 0.0:
-                                names_grads_copy.append(copy.deepcopy(param.grad.data))
+                            #?if self.meta_param['momentum_init_grad'] > 0.0:
+                            #?    names_grads_copy.append(copy.deepcopy(param.grad))
                         else:
                             if self.iter == 0:
                                 logger.info("[{}] This parameter does have requires_grad".format(name))
@@ -1274,16 +1186,16 @@ class Trainer(object):
                                     flag_splits[i] = True
                             flag_target = all(flag_splits)
                             if flag_target:
-                                if param.requires_grad:
+                                if  not param.stop_gradient:
                                     names_weights_copy['self.model.' + name] = param
-                                    if self.meta_param['momentum_init_grad'] > 0.0:
-                                        names_grads_copy.append(copy.deepcopy(param.grad.data))
+                                    #?if self.meta_param['momentum_init_grad'] > 0.0:
+                                    #?    names_grads_copy.append(copy.deepcopy(param.grad))
                                 else:
                                     if self.iter == 0:
                                         logger.info("[{}] This parameter does have requires_grad".format(name))
 
                 if self.meta_param['norm_zero_grad'] and self.optimizer_norm != None:
-                    self.optimizer_norm.zero_grad()
+                    self.optimizer_norm.clear_grad()
                 # for name, val in names_weights_copy.items():
                 #     print(name)
                 # for name, val in self.model.named_parameters():
@@ -1301,56 +1213,57 @@ class Trainer(object):
                 if (self.meta_param['synth_grad'] == 'none') or (self.meta_param['synth_grad'] == 'reverse'):
 
                     if self.scaler != None:
-                        if self.cfg.META.SOLVER.EARLY_SCALE:
-                            inv_scale = 1. / self.scaler.get_scale()
+                        if self.cfg['META']['SOLVER']['EARLY_SCALE']:
+                            inv_scale = 1. / self.get_curr_scale(self.scaler)
                             losses *= inv_scale
 
                     if self.scaler != None:
-                        grad_params = torch.autograd.grad(
-                            self.scaler.scale(losses), names_weights_copy.values(),
+                        grad_params = paddle.grad(
+                            self.scaler.scale(losses), list(names_weights_copy.values()),
                             create_graph=opt['use_second_order'], allow_unused=opt['allow_unused'])
                     else:
-                        grad_params = torch.autograd.grad(
-                            losses, names_weights_copy.values(),
+                        grad_params = paddle.grad(
+                            losses, list(names_weights_copy.values()),
                             create_graph=opt['use_second_order'], allow_unused=opt['allow_unused'])
-
+                    '''not used
                     if self.meta_param['synth_grad'] == 'reverse':
                         for val in grad_params:
                             val *= -1.0
+                    
                 else:
                     if self.meta_param['synth_grad'] == 'constant':
                         grad_params = list()
                         for val in names_weights_copy.values():
-                            synth_grad = copy.deepcopy(val.data)
+                            synth_grad = copy.deepcopy(val)
                             synth_grad[:] = self.meta_param['constant_grad']
                             grad_params.append(synth_grad)
                         grad_params = tuple(grad_params)
                     elif self.meta_param['synth_grad'] == 'random':
                         grad_params = list()
                         for val in names_weights_copy.values():
-                            synth_grad = copy.deepcopy(val.data)
-                            synth_grad[:] = torch.randn(val.shape) * self.meta_param['random_scale_grad']
+                            synth_grad = copy.deepcopy(val)
+                            synth_grad[:] = paddle.randn(val.shape) * self.meta_param['random_scale_grad']
                             grad_params.append(synth_grad)
                         grad_params = tuple(grad_params)
-
+                    '''
                 # if grad_params[0].requires_grad:
                 #     for x in names_grads_copy:
                 #         x.requires_grad = True
 
 
                 # for i in range(len(grad_params)):
-                #     grad_params[i][torch.isnan(grad_params[i])] = 1.0
+                #     grad_params[i][paddle.isnan(grad_params[i])] = 1.0
 
                 if opt['stop_gradient']:
                     grad_params = list(grad_params)
                     for i in range(len(grad_params)):
-                        if grad_params[i] != None:
-                            grad_params[i] = Variable(grad_params[i].data, requires_grad=False)
+                        if grad_params[i] is not None:
+                            grad_params[i] = paddle.to_tensor(grad_params[i], stop_gradient=True)
                         else:
                             if self.iter == 0:
                                 logger.info("[{}th grad] This parameter does have gradient".format(i))
                     grad_params = tuple(grad_params)
-
+                '''not used
                 if self.meta_param['momentum_init_grad'] > 0.0:
                     grad_params = list(grad_params)
                     for i in range(len(grad_params)):
@@ -1361,15 +1274,15 @@ class Trainer(object):
                             if self.iter == 0:
                                 logger.info("[{}th grad] This parameter does have gradient".format(i))
                     grad_params = tuple(grad_params)
-
-                if self.scaler != None:
-                    if not self.cfg.META.SOLVER.EARLY_SCALE:
-                        inv_scale = 1. / self.scaler.get_scale()
-                        opt['grad_params'] = [p * inv_scale if p != None else None for p in grad_params ]
+                '''
+                if self.scaler is not None:
+                    if not self.cfg['META']['SOLVER']['EARLY_SCALE']: # not used
+                        inv_scale = 1. / self.get_curr_scale(self.scaler)
+                        opt['grad_params'] = [p * inv_scale if p is not None else None for p in grad_params ]
                     else:
-                        opt['grad_params'] = [p if p != None else None for p in grad_params ]
-                else:
-                    opt['grad_params'] = [p if p != None else None for p in grad_params ]
+                        opt['grad_params'] = [p if p is not None else None for p in grad_params ]
+                else: # not used
+                    opt['grad_params'] = [p if p is not None else None for p in grad_params ]
                 opt['meta_loss'] = None
             else:
                 opt['meta_loss'] = losses
@@ -1379,7 +1292,7 @@ class Trainer(object):
                 # for name, param in self.model.named_parameters():
                 #     if param.requires_grad:
                 #         names_weights_copy['self.model.' + name] = param
-                # scaled_grad_params = torch.autograd.grad(
+                # scaled_grad_params = paddle.grad(
                 #     self.scaler.scale(losses), names_weights_copy.values(),
                 #     create_graph=opt['use_second_order'], allow_unused=opt['allow_unused'])
                 # inv_scale = 1. / self.scaler.get_scale()
@@ -1390,6 +1303,43 @@ class Trainer(object):
                 #     opt['grad_params'].append(names_weights_copy[i] - 0.0001 * scaled_grad_params[i])
                 # opt['meta_loss'] = None
         return opt
+
+    #####################################################################
+    # for logger
+    #####################################################################
+    def print_selected_optimizer(self, txt, idx_group, optimizer, detail_mode):
+        return
+        try:
+            num_period = self.meta_param['write_period_param']
+        except:
+            num_period = 100
+        if detail_mode and (self.iter <= 5 or self.iter % num_period == 0):
+            if optimizer != None:
+                num_float = 8
+                for x in idx_group:
+                    t_name = optimizer._param_groups[x]['name']
+                    t_param = optimizer._param_groups[x]['params'][0].view(-1)[0]
+                    t_lr = optimizer._param_groups[x]['lr']
+                    t_grad = optimizer._param_groups[x]['params'][0].stop_gradient
+                    t_grad_val = optimizer._param_groups[x]['params'][0].grad
+                    if t_grad_val != None:
+                        if paddle.sum(t_grad_val) == 0:
+                            t_grad_val = 'Zero'
+                        else:
+                            t_grad_val = 'Exist'
+                    # t_shape = optimizer.param_groups[x]['params'][0].shape
+                    for name, param in self.model.named_parameters():
+                        if name == t_name:
+                            m_param = param.view(-1)[0]
+                            m_grad = param.stop_gradient
+                            m_grad_val = param.grad
+                            if m_grad_val != None:
+                                if paddle.sum(m_grad_val) == 0:
+                                    m_grad_val = 'Zero'
+                                else:
+                                    m_grad_val = 'Exist'
+                            val = paddle.sum(param - optimizer.param_groups[x]['params'][0])
+                            break
 
     @classmethod
     def test(cls, dataset_name, model, evaluators=None):

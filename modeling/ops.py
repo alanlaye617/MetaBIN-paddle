@@ -1,7 +1,6 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.autograd as autograd
 import math
 import copy
 
@@ -14,11 +13,12 @@ def update_parameter(param, step_size, opt = None):
     allow_unused = opt['allow_unused']
     stop_gradient = opt['stop_gradient']
     flag_update = False
+    assert not use_second_order, 'Use second order!' 
     if step_size is not None:
         if not stop_gradient:
             if param is not None:
                 if opt['auto_grad_outside']:
-                    if opt['grad_params'][0] == None:
+                    if opt['grad_params'][0] is None:
                         del opt['grad_params'][0]
                         updated_param = param
                     else:
@@ -28,7 +28,7 @@ def update_parameter(param, step_size, opt = None):
                         del opt['grad_params'][0]
                 else:
                     # inner
-                    grad = autograd.grad(loss, param, create_graph=use_second_order, allow_unused=allow_unused)[0]
+                    grad = paddle.grad(loss, param, create_graph=use_second_order, allow_unused=allow_unused)[0]
                     updated_param = param - step_size * grad
                 # outer update
                 # updated_param = opt['grad_params'][0]
@@ -38,7 +38,7 @@ def update_parameter(param, step_size, opt = None):
             if param is not None:
 
                 if opt['auto_grad_outside']:
-                    if opt['grad_params'][0] == None:
+                    if opt['grad_params'][0] is None:
                         del opt['grad_params'][0]
                         updated_param = param
                     else:
@@ -46,10 +46,10 @@ def update_parameter(param, step_size, opt = None):
                         # outer
                         updated_param = param - step_size * opt['grad_params'][0]
                         del opt['grad_params'][0]
-                else:
+                else:   # not used
                     # inner
                     # grad = Variable(autograd.grad(loss, param, create_graph=use_second_order, allow_unused=allow_unused)[0].data, requires_grad=False)
-                    grad = paddle.to_tensor(autograd.grad(loss, param, create_graph=use_second_order, allow_unused=allow_unused)[0].data, stop_gradient=True)
+                    grad = paddle.grad(loss, param, create_graph=use_second_order, allow_unused=allow_unused)[0]
                     updated_param = param - step_size * grad
                 # outer update
                 # updated_param = opt['grad_params'][0]
@@ -209,7 +209,7 @@ class meta_bn(nn.BatchNorm2D):
                 compute_each_batch = False
         if norm_type == "eval":
             compute_each_batch = False
-
+        assert compute_each_batch == False 
         if compute_each_batch:
             domain_idx = opt['domains']
             unique_domain_idx = [int(x) for x in paddle.unique(domain_idx).cpu()]
@@ -227,6 +227,7 @@ class meta_bn(nn.BatchNorm2D):
                                           self.training, self._momentum, self._epsilon)
                 elif norm_type == "eval":  # fix and apply running_mean/var,
                     if self._mean is None:
+                        #result_local = F.batch_norm(inputs[t_logical_domain], None, None,
                         result_local = F.batch_norm(inputs[t_logical_domain], None, None,
                                               updated_weight, updated_bias,
                                               True, self._momentum, self._epsilon)
@@ -247,12 +248,14 @@ class meta_bn(nn.BatchNorm2D):
                                       updated_weight, updated_bias,
                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "hold": # not update, not apply running_mean/var
-                result = F.batch_norm(inputs, None, None,
+                #result = F.batch_norm(inputs, None, None,
+                result = F.batch_norm(inputs, paddle.mean(inputs, axis=1), paddle.var(inputs, axis=1),
                                       updated_weight, updated_bias,
                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "eval": # fix and apply running_mean/var,
                 if self._mean is None:
-                    result = F.batch_norm(inputs, None, None,
+                    #result = F.batch_norm(inputs, None, None,
+                    result = F.batch_norm(inputs, paddle.mean(inputs, axis=1), paddle.var(inputs, axis=1),
                                           updated_weight, updated_bias,
                                           True, self._momentum, self._epsilon)
                 else:

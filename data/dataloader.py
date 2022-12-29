@@ -220,7 +220,7 @@ def build_reid_test_loader(dataset_name, batch_size, num_workers=2, flag_test=Tr
     return test_loader, len(dataset.query)
 
 
-def build_train_loader_for_m_resnet(dataset_list=['Market1501'], batch_size=96, num_instance=4, num_workers=2, world_size=1, seed=None):
+def build_train_loader_for_m_resnet(dataset_list=['Market1501'], batch_size=96, num_instance=4, num_workers=0, world_size=1, seed=None):
     train_loader_kwargs_for_m_resnet = {
         'drop_last': True,         # cfg.DATALOADER.DROP_LAST,
         'naive_way': True,         # cfg.DATALOADER.NAIVE_WAY,
