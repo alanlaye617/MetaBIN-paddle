@@ -38,17 +38,20 @@ def loss_test():
         inputs_pad = next(train_loader.__iter__())
         inputs_ref = translate_inputs_p2t(inputs_pad)
 
-        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
-        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
+        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss', 'SCT', ), 'type_running_stats': 'general', 'each_domain': False})
+        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT']})
 
         reprod_log_ref.add("CEloss_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
         reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
+        reprod_log_ref.add("SCT_%d"%(i), losses_ref['loss_stc'].cpu().detach().numpy())
 
-        outputs_pad = model_pad(inputs_pad, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})
-        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', "TripletLoss"]})
+        outputs_pad = model_pad(inputs_pad, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss', 'SCT'), 'type_running_stats': 'general', 'each_domain': False})
+        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT']})
 
         reprod_log_pad.add("CEloss_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
         reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
+        reprod_log_pad.add("SCT_%d"%(i), losses_pad['loss_stc'].cpu().detach().numpy())
+
         del outputs_pad, outputs_ref, losses_ref, losses_pad, inputs_ref
     reprod_log_ref.save('./result/loss_ref.npy')
     reprod_log_pad.save('./result/loss_paddle.npy')

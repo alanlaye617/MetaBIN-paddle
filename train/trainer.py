@@ -133,12 +133,12 @@ class Trainer(object):
         meta_param['loss_name_mtrain'] = self.cfg['META']['LOSS']['MTRAIN_NAME']
         meta_param['loss_name_mtest'] = self.cfg['META']['LOSS']['MTEST_NAME']
 
-        #logger.info('-' * 30)
-        #logger.info('Meta-learning paramters')
-        #logger.info('-' * 30)
-        #for name, val in meta_param.items():
-        #    logger.info('[M_param] {}: {}'.format(name, val))
-        #logger.info('-' * 30)
+        logger.info('-' * 30)
+        logger.info('Meta-learning paramters')
+        logger.info('-' * 30)
+        for name, val in meta_param.items():
+            logger.info('[M_param] {}: {}'.format(name, val))
+        logger.info('-' * 30)
 
         meta_param['update_cyclic_ratio'] = self.cfg['META']['SOLVER']['LR_FACTOR']['META_CYCLIC_RATIO']
         meta_param['update_cyclic_period'] = self.cfg['META']['SOLVER']['LR_FACTOR']['META_CYCLIC_PERIOD_PER_EPOCH']
@@ -159,11 +159,7 @@ class Trainer(object):
                     num_step_up = one_period - 1
                     num_step_down = 1
 
-                # TODO
-                #self.cyclic_optimizer = optimizer.SGD([Variable(paddle.zeros(1), requires_grad=False)], lr=0.1)
-                #?
                 self.cyclic_scheduler = optimizer.lr.CyclicLR(
-                   # optimizer=self.cyclic_optimizer,
                     base_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] / meta_param['update_cyclic_ratio'],
                     max_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] * meta_param['update_cyclic_ratio'],
                     step_size_up = num_step_up,
@@ -532,6 +528,7 @@ class Trainer(object):
         with EventStorage(start_iter) as self.storage:
             self.before_train() # check hooks.py, engine/defaults.py
             for self.iter in range(start_iter, max_iter):
+                print('iter:', self.iter)
                 self.before_step()
                 if self.cfg['META']['DATA']['NAMES'] == '': # general learning (not meta-learning)
                     self.run_step() # unused
@@ -544,11 +541,13 @@ class Trainer(object):
                     else:
                         max_init = self.meta_param['iter_init_inner']
                     while (self.cnt < max_init):
+                        print('update base model')
                         self.run_step_meta_learning1() # update base model
                         self.cnt += 1
 
                     self.cnt = 0
                     while (self.cnt < self.meta_param['iter_init_outer']):
+                        print('update balancing parameters')
                         self.run_step_meta_learning2() # update balancing parameters (meta-learning)
                         self.cnt += 1
                         self.global_meta_cnt += 1
@@ -590,6 +589,7 @@ class Trainer(object):
                 outs = model(data, opt)
                 loss_dict = model.losses(outs, opt)
                 losses = sum(loss_dict.values())
+                print('loss', losses[0])
             self._detect_anomaly(losses, loss_dict)
         else:
             losses = None
