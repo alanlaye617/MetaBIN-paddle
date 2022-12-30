@@ -123,14 +123,14 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
         dist_mat = cosine_dist(all_embedding, all_embedding)
 
     N = dist_mat.shape[0]
-    if (pos_flag == [1,0,0] and neg_flag == [0,1,1]) or domain_labels == None:
+    if (pos_flag == [1,0,0] and neg_flag == [0,1,1]) or domain_labels is None:
         is_pos = all_targets.reshape([N, 1]).expand([N, N]).equal(all_targets.reshape([N, 1]).expand([N, N]).t())
         is_neg = all_targets.reshape([N, 1]).expand([N, N]).not_equal(all_targets.reshape([N, 1]).expand([N, N]).t())
     else:
         vec1 = copy.deepcopy(all_targets)
         for i in range(N):
             vec1[i] = i # [0,1,2,3,4,~~]
-        is_same_img = vec1.expand([N, N]).eq(vec1.expand([N, N]).t())
+        is_same_img = vec1.expand([N, N]).equal(vec1.expand([N, N]).t())
         is_same_instance = all_targets.reshape([N, 1]).expand([N, N]).equal(all_targets.reshape([N, 1]).expand([N, N]).t())
         is_same_domain = domain_labels.reshape([N, 1]).expand([N, N]).equal(domain_labels.reshape([N, 1]).expand([N, N]).t())
 
@@ -146,11 +146,11 @@ def triplet_loss(embedding, targets, margin, norm_feat, hard_mining, dist_type, 
         is_neg[:] = False
         for i, bool_flag in enumerate(pos_flag):
             if bool_flag == 1:
-                is_pos += set_all[i]
+                is_pos = paddle.logical_or(is_pos, set_all[i])
 
         for i, bool_flag in enumerate(neg_flag):
             if bool_flag == 1:
-                is_neg += set_all[i]
+                is_neg = paddle.logical_or(is_neg, set_all[i])
 
         # print(pos_flag)
         # print(is_pos.type(torch.IntTensor))

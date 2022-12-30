@@ -150,9 +150,9 @@ class meta_bin(nn.Layer):
             # print(update_gate[0].data.cpu())
         else:
             update_gate = self.gate
-        update_gate = update_gate.unsqueeze([0, -1, -1])
         out_bn = self.bat_n(inputs, opt)
         out_in = self.ins_n(inputs, opt)
+        update_gate = update_gate.unsqueeze([0, -1, -1]).astype(out_bn.dtype)
         out = out_bn * update_gate + out_in * (1-update_gate)
         return out
 
@@ -249,13 +249,13 @@ class meta_bn(nn.BatchNorm2D):
                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "hold": # not update, not apply running_mean/var
                 #result = F.batch_norm(inputs, None, None,
-                result = F.batch_norm(inputs, paddle.mean(inputs, axis=1), paddle.var(inputs, axis=1),
+                result = F.batch_norm(inputs, paddle.mean(inputs, axis=(0, 2, 3)), paddle.var(inputs, axis=(0, 2, 3)),
                                       updated_weight, updated_bias,
                                       self.training, self._momentum, self._epsilon)
             elif norm_type == "eval": # fix and apply running_mean/var,
                 if self._mean is None:
                     #result = F.batch_norm(inputs, None, None,
-                    result = F.batch_norm(inputs, paddle.mean(inputs, axis=1), paddle.var(inputs, axis=1),
+                    result = F.batch_norm(inputs, paddle.mean(inputs, axis=(0, 2, 3)), paddle.var(inputs, axis=(0, 2, 3)),
                                           updated_weight, updated_bias,
                                           True, self._momentum, self._epsilon)
                 else:

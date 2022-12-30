@@ -92,9 +92,10 @@ def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['M
         trainer.resume_or_load(resume=resume)
     return trainer
 
-def build_ref_model(num_classes, resume=False):
+def build_ref_model(num_classes, resume=False, pretrain=True):
     cfg = create_cfg()
     cfg.defrost()
+    cfg.MODEL.BACKBONE.PRETRAIN = pretrain
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
     model = Trainer.build_model(cfg)
     if resume:

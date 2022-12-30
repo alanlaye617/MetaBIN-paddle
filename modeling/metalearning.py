@@ -6,7 +6,7 @@ from .heads import MetalearningHead
 from .losses import cross_entropy_loss, triplet_loss, domain_SCT_loss
 
 class Metalearning(nn.Layer):
-    def __init__(self, num_classes,  name_scope=None, dtype="float32"):
+    def __init__(self, num_classes, name_scope=None, dtype="float32"):
         super().__init__(name_scope, dtype)
         pixel_mean = paddle.to_tensor([123.675, 116.28, 103.53]).unsqueeze((0, -1, -1))
         pixel_std = paddle.to_tensor([58.395, 57.120000000000005, 57.375]).unsqueeze((0, -1, -1))
@@ -95,6 +95,50 @@ class Metalearning(nn.Layer):
                 domain_labels=domain_labels,
                 pos_flag=[1, 0, 0],
                 neg_flag=[0, 1, 1],
+            ) * 1.0
+
+        if "TripletLoss_add" in loss_names:
+            loss_dict['loss_triplet_add'] = triplet_loss(
+                pooled_features,
+                gt_labels,
+                margin=0.0,
+                norm_feat=False,
+                hard_mining=True,
+                dist_type='euclidean',
+                loss_type='logistic',
+                domain_labels=domain_labels,
+                pos_flag=[0, 0, 1],
+                neg_flag=[0, 1, 0]
+            ) * 1.0
+
+
+        if "TripletLoss_mtrain" in loss_names:
+            loss_dict['loss_triplet_mtrain'] = triplet_loss(
+                pooled_features,
+                gt_labels,
+                margin=0.3,
+                norm_feat=False,
+                hard_mining=True,
+                dist_type='euclidean',
+                loss_type='logistic',
+                domain_labels=domain_labels,
+                pos_flag=[1, 0, 0],
+                neg_flag=[0, 1, 1]
+            ) * 1.0
+
+
+        if "TripletLoss_mtest" in loss_names:
+            loss_dict['loss_triplet_mtest'] = triplet_loss(
+                pooled_features,
+                gt_labels,
+                margin=0.3,
+                norm_feat=False,
+                hard_mining=True,
+                dist_type='euclidean',
+                loss_type='logistic',
+                domain_labels=domain_labels,
+                pos_flag=[1, 0, 0],
+                neg_flag=[0, 1, 1]
             ) * 1.0
         return loss_dict
     """

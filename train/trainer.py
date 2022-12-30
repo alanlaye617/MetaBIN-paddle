@@ -18,7 +18,6 @@ from optim import build_lr_scheduler, build_optimizer
 from utils.events import EventStorage
 from .hooks import HookBase, LRScheduler
 
-
 logger = logging.getLogger(__name__)
 
 class Trainer(object):
@@ -38,7 +37,7 @@ class Trainer(object):
         self.auto_scale_hyperparams()
 
         num_classes = self.data_loader.dataset.num_classes
-        self.model = self.build_model(num_classes)
+        self.model = self.build_model(num_classes, pretrain=True)
 
         self.scheduler_main = self.build_lr_scheduler(
             milestones=self.cfg['SOLVER']['STEPS'], 
@@ -391,8 +390,11 @@ class Trainer(object):
         return build_optimizer(model, base_lr, lr_scheduler, momentum, flag=flag)
 
     @classmethod
-    def build_model(cls, num_classes):
-        return Metalearning(num_classes=num_classes)
+    def build_model(cls, num_classes, pretrain=True, pretrain_path='./model_weights/pretrained_resnet50.pdparams'):
+        model = Metalearning(num_classes=num_classes)
+        if pretrain:
+            model.backbone.set_state_dict(paddle.load(pretrain_path))
+        return model
 
     @classmethod
     def build_test_loader(cls, dataset_name, batch_size, num_workers=2, flag_test=True):
@@ -660,8 +662,7 @@ class Trainer(object):
     #####################################################################
     # meta-learning (update balancing parameters)
     #####################################################################
-    def run_step_meta_learning2(self): # TODO
-
+    def run_step_meta_learning2(self):
 
         # start = time.perf_counter()
         # Meta-learning
@@ -926,7 +927,7 @@ class Trainer(object):
                             if cnt == 0:
                                 t_logical_domain = domain_idx == sample
                             else:
-                                #t_logical_domain += domain_idx == sample    # questionable
+                                #t_logical_domain += domain_idx == sample
                                 t_logical_domain = paddle.logical_or(t_logical_domain, domain_idx == sample)
                             cnt += 1
 
@@ -1053,13 +1054,15 @@ class Trainer(object):
 
     @staticmethod
     def get_curr_scale(scaler):
-        # TODO
-        return 1.0
+        if scaler._enable:
+            return scaler._scale.item()
+        else:
+            return 1.0
+
     #####################################################################
     # set options (basic, mtrain, mtest) important!
     #####################################################################
     def opt_setting(self, flag, losses = None):
-        # TODO
         if flag == 'basic':
             opt = {}
             opt['param_update'] = False
@@ -1120,11 +1123,9 @@ class Trainer(object):
             # allocate stepsize
             for name, val in self.all_layers.items(): # compute stepsize
                 if self.all_layers[name]['w_param_idx'] != None:
+                    #self.all_layers[name]['w_step_size'] = self.optimizer_main.param_groups[self.all_layers[name]['w_param_idx']]["lr"] * meta_ratio
                     self.all_layers[name]['w_step_size'] = self.get_curr_lr(self.optimizer_main, self.all_layers[name]['w_param_idx']) * meta_ratio
-                    '''
-                    self.all_layers[name]['w_step_size'] = \
-                        self.optimizer_main.param_groups[self.all_layers[name]['w_param_idx']]["lr"] * meta_ratio
-                    '''
+
                 else:
                     self.all_layers[name]['b_step_size'] = None
 
