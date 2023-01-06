@@ -144,7 +144,7 @@ class TrainerBase:
                         self.run_step_meta_learning2() # update balancing parameters (meta-learning)
                         self.cnt += 1
                         self.global_meta_cnt += 1
-                    # print(self.iter)
+                    print(self.iter)
                 self.after_step()
             self.after_train()
     def before_train(self):
@@ -529,11 +529,13 @@ class SimpleTrainer(TrainerBase):
                     data_mtrain = data[0]
                     data_mtest = data[1]
                 else:
+                    raise AssertionError
                     data_mtrain, data_time = self.get_data(self._data_loader_iter_mtrain, list_sample=list_mtrain)
                     self.data_time_all += data_time
                     data_mtest, data_time = self.get_data(self._data_loader_iter_mtrain, list_sample=list_mtest)
                     self.data_time_all += data_time
             else:
+                raise AssertionError
                 if self.meta_param['synth_data'] != 'none' and self.meta_param['synth_method'] != 'none':
 
                     if self.meta_param['synth_method'] == 'real': # mtrain (real) -> mtest (fake)
@@ -923,6 +925,7 @@ class SimpleTrainer(TrainerBase):
                     self.cyclic_scheduler.step()
                     meta_ratio = self.cyclic_optimizer.param_groups[0]['lr']
                 else: # not used (old version)
+                    raise AssertionError
                     one_period = self.meta_param['iters_per_epoch'] / self.meta_param['update_cyclic_period']
                     b = math.log10(self.meta_param['update_cyclic_ratio'])
                     a = b / (one_period/4.0*1.0)
@@ -941,6 +944,7 @@ class SimpleTrainer(TrainerBase):
                         meta_ratio = - b + a * rem_val # y = -b + ax
                     meta_ratio = pow(10, meta_ratio)
             else:
+                raise AssertionError
                 meta_ratio = self.meta_param['update_ratio']
 
             # allocate stepsize
@@ -980,9 +984,11 @@ class SimpleTrainer(TrainerBase):
                 # outer
                 names_weights_copy = dict()
                 if self.meta_param['momentum_init_grad'] > 0.0:
+                    raise AssertionError
                     names_grads_copy = list()
                 for name, param in self.model.named_parameters():
                     if self.meta_param['meta_all_params']:
+                        raise AssertionError
                         if param.requires_grad:
                             names_weights_copy['self.model.' + name] = param
                             if self.meta_param['momentum_init_grad'] > 0.0:
@@ -1009,6 +1015,7 @@ class SimpleTrainer(TrainerBase):
                                 if param.requires_grad:
                                     names_weights_copy['self.model.' + name] = param
                                     if self.meta_param['momentum_init_grad'] > 0.0:
+                                        raise AssertionError
                                         names_grads_copy.append(copy.deepcopy(param.grad.data))
                                 else:
                                     if self.iter == 0:
@@ -1042,14 +1049,17 @@ class SimpleTrainer(TrainerBase):
                             self.scaler.scale(losses), names_weights_copy.values(),
                             create_graph=opt['use_second_order'], allow_unused=opt['allow_unused'])
                     else:
+                        raise AssertionError
                         grad_params = torch.autograd.grad(
                             losses, names_weights_copy.values(),
                             create_graph=opt['use_second_order'], allow_unused=opt['allow_unused'])
 
                     if self.meta_param['synth_grad'] == 'reverse':
+                        raise AssertionError
                         for val in grad_params:
                             val *= -1.0
                 else:
+                    raise AssertionError
                     if self.meta_param['synth_grad'] == 'constant':
                         grad_params = list()
                         for val in names_weights_copy.values():
@@ -1084,6 +1094,7 @@ class SimpleTrainer(TrainerBase):
                     grad_params = tuple(grad_params)
 
                 if self.meta_param['momentum_init_grad'] > 0.0:
+                    raise AssertionError
                     grad_params = list(grad_params)
                     for i in range(len(grad_params)):
                         if grad_params[i] != None:
@@ -1096,14 +1107,17 @@ class SimpleTrainer(TrainerBase):
 
                 if self.scaler != None:
                     if not self.cfg.META.SOLVER.EARLY_SCALE:
+                        raise AssertionError
                         inv_scale = 1. / self.scaler.get_scale()
                         opt['grad_params'] = [p * inv_scale if p != None else None for p in grad_params ]
                     else:
                         opt['grad_params'] = [p if p != None else None for p in grad_params ]
                 else:
+                    raise AssertionError
                     opt['grad_params'] = [p if p != None else None for p in grad_params ]
                 opt['meta_loss'] = None
             else:
+                raise AssertionError
                 opt['meta_loss'] = losses
 
                 # outer update

@@ -16,7 +16,10 @@ class Metalearning(nn.Layer):
         self.heads = MetalearningHead(num_classes)
         self.num_classes = num_classes
         #self.init_lr()
-
+    @property
+    def device(self):
+        return self.pixel_mean.device
+        
     def forward(self, batched_inputs, opt=None):
         if self.training:
             images = self.preprocess_image(batched_inputs)

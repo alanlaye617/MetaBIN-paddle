@@ -68,19 +68,22 @@ def backward_test():
     optimizer_norm_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_norm_pad, momentum=0, flag='norm')
     #optimizer_pad = Momentum(learning_rate=1e-5, momentum=0.9, parameters=model_pad.parameters())
     #optimizer_ref = SGD(params=model_ref.parameters(), lr=1e-5, momentum=0.9)
-    for i in tqdm(range(15)):
+    opt_pad = trainer_pad.opt_setting('basic')
+    opt_ref = trainer_ref.opt_setting('basic')
+
+    for i in tqdm(range(5)):
         inputs_ref = next(train_loader.__iter__())
        # inputs_ref = translate_inputs_p2t(inputs_pad)
-        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
-        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
+        outputs_ref = model_ref(inputs_ref, opt_ref)
+        losses_ref = model_ref.losses(outputs_ref, opt_ref)
 #        reprod_log_ref.add("output_%d"%(i), outputs_ref['outputs']['bn_features'].cpu().detach().numpy())
         reprod_log_ref.add("CEloss_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
       #  reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
 
         inputs_pad = translate_inputs_t2p(inputs_ref)
 
-        outputs_pad = model_pad(inputs_pad, {'param_update': False,  'type_running_stats': 'general', 'each_domain': False})
-        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
+        outputs_pad = model_pad(inputs_pad, opt_pad)
+        losses_pad = model_pad.losses(outputs_pad, opt_pad)
 #        reprod_log_pad.add("output_%d"%(i), outputs_pad['outputs']['bn_features'].cpu().detach().numpy())
         reprod_log_pad.add("CEloss_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
      #   reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
