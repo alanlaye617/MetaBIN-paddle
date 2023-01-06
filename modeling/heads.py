@@ -27,7 +27,7 @@ class MetalearningHead(nn.Layer):
 
         num_classes = num_classes
         # cls_type = linear
-        self.classifier_fc = meta_linear(in_feat, num_classes, weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(0, 0.001)), bias_attr=False)
+        self.classifier_fc = meta_linear(in_feat, num_classes, bias_attr=False)
 
     def forward(self, features, targets=None, opt=None):
         global_feat = self.pool_layer(features)

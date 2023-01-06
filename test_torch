@@ -1,0 +1,4 @@
+from utils import build_ref_trainer
+
+trainer = build_ref_trainer(batch_size=32, eval_only=False, resume=False)
+trainer.train()

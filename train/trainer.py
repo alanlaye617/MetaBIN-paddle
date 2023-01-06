@@ -9,20 +9,21 @@ import numpy as np
 import logging
 import weakref
 import time
-import math
+import re
 
-from evaluation import ReidEvaluator
-from data import build_test_loader_for_m_resnet, build_train_loader_for_m_resnet, build_reid_test_loader
+from evaluation import ReidEvaluator, inference_on_dataset
+from data import build_train_loader_for_m_resnet, build_reid_test_loader
 from modeling import Metalearning
 from optim import build_lr_scheduler, build_optimizer
 from utils.events import EventStorage
-from .hooks import HookBase, LRScheduler
+from .hooks import *
 
 logger = logging.getLogger(__name__)
 
 class Trainer(object):
-    def __init__(self, train_batch_size=None, mode='M-ResNet') -> None:
+    def __init__(self, train_batch_size=None, mode='M-ResNet', output_dir='logs') -> None:
         self._hooks = []
+        self.output_dir = output_dir
         assert mode in ['M-ResNet']
         self.cfg = self.get_cfg(mode)
         if train_batch_size != None: self.cfg['SOLVER']['IMS_PER_BATCH'] = train_batch_size
@@ -32,7 +33,7 @@ class Trainer(object):
             batch_size=self.cfg['SOLVER']['IMS_PER_BATCH'],
             num_instance=self.cfg['DATALOADER']['NUM_INSTANCE'],
             world_size=1)
-
+        
         self.cfg['META']['DATA']['NUM_DOMAINS'] = num_domains
         self.auto_scale_hyperparams()
 
@@ -160,8 +161,8 @@ class Trainer(object):
                     num_step_down = 1
 
                 self.cyclic_scheduler = optimizer.lr.CyclicLR(
-                    base_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] / meta_param['update_cyclic_ratio'],
-                    max_learning_rate= 0.1 * meta_param['update_cyclic_middle_lr'] * meta_param['update_cyclic_ratio'],
+                    base_learning_rate= meta_param['update_cyclic_middle_lr'] / meta_param['update_cyclic_ratio'],
+                    max_learning_rate= meta_param['update_cyclic_middle_lr'] * meta_param['update_cyclic_ratio'],
                     step_size_up = num_step_up,
                     step_size_down = num_step_down,
                 )
@@ -172,7 +173,6 @@ class Trainer(object):
         self.meta_param = meta_param
         if self.cfg['SOLVER']['AMP']:
             self.scaler = paddle.amp.GradScaler()
-            # self.scaler = paddle.cuda.amp.GradScaler()
         else:
             self.scaler = None
 
@@ -208,9 +208,9 @@ class Trainer(object):
             
             self.initial_requires_grad = self.grad_requires_init(model = self.model)
             find_group = ['layer1_conv_weight', 'layer1_conv_bias',
-                          'layer1_bn_weight', 'layer1_bn_bias',
+                          'layer1_bn_(weight|scale)', 'layer1_bn_bias',
                           'classifier_fc_weight', 'classifier_fc_bias',
-                          'classifier_norm_weight', 'classifier_norm_bias',]
+                          'classifier_norm_(weight|scale)', 'classifier_norm_bias',]
             new_group = list(self.cat_tuples(self.meta_param['meta_compute_layer'], self.meta_param['meta_update_layer']))
             find_group.extend(new_group)
             find_group = list(set(find_group))
@@ -223,8 +223,16 @@ class Trainer(object):
             # allocate whether each layer applies meta_learning (important!)
             self.all_layers = dict() # find all parameters
             for name, param in self.model.named_parameters():
+                if '_mean' in name or '_variance' in name:
+                    continue
                 name = '.'.join(name.split('.')[:-1])
                 raw_name = copy.copy(name)
+                name = re.sub(r'\.(?P<n>\d+)\.', lambda x: '['+ x.group('n')+'].', name)  
+                if name not in self.all_layers:
+                    self.all_layers[name] = dict()
+                    self.all_layers[name]['name'] = name
+                    self.all_layers[name]['raw_name'] = raw_name       
+                ''' ????????
                 for i in range(50):
                     name = name.replace('.{}.'.format(i), '[{}].'.format(i))
                 exist_name = False
@@ -235,13 +243,14 @@ class Trainer(object):
                     self.all_layers[name] = dict()
                     self.all_layers[name]['name'] = name
                     self.all_layers[name]['raw_name'] = raw_name
+                '''
 
             for name, val in self.all_layers.items(): # allocate ordered index corresponding to each parameter
                 self.all_layers[name]['w_param_idx'] = None
                 self.all_layers[name]['b_param_idx'] = None
                 self.all_layers[name]['g_param_idx'] = None
                 for i, g in enumerate(self.optimizer_main._param_groups):
-                    if val['raw_name'] + '.weight' == g['name']:
+                    if val['raw_name'] + '.weight' == g['name'] or val['raw_name'] + '.scale' == g['name']:
                         self.all_layers[name]['w_param_idx'] = i
                     if val['raw_name'] + '.bias' == g['name']:
                         self.all_layers[name]['b_param_idx'] = i
@@ -335,7 +344,7 @@ class Trainer(object):
             logger.info('Meta compute layer : {}'.format(self.meta_param['meta_compute_layer']))
             for name, val in self.all_layers.items():
                 logger.info('Name: {}, meta_param: {}, meta_gate: {}'.format(name, val[new_object_name_params], val[new_object_name_gates]))
-        else:
+        else: # not used
             '''
             find_group = ['layer1_conv_weight', 'layer1_conv_bias',
                           'layer1_bn_weight', 'layer1_bn_bias',
@@ -343,10 +352,10 @@ class Trainer(object):
                           'classifier_norm_weight', 'classifier_norm_bias',]
             '''
             find_group = ['layer1_conv_weight', 'layer1_conv_bias',
-                          'layer1_bn_weight', 'layer1_bn_bias',
-                          'layer1_bn_mean_weight', 'layer1_bn_var_weight',
+                          'layer1_bn_(weight|scale)', 'layer1_bn_bias',
+                          'layer1_bn_mean_(weight|scale)', 'layer1_bn_var_weight',
                           'classifier_fc_weight', 'classifier_fc_bias',
-                          'classifier_norm_weight', 'classifier_norm_bias',]
+                          'classifier_norm_(weight|scale)', 'classifier_norm_bias',]
             idx_group, dict_group = self.find_selected_optimizer(find_group, self.optimizer_main)
             self.idx_group = idx_group
             self.dict_group = dict_group
@@ -426,6 +435,11 @@ class Trainer(object):
                         self.scheduler_main,
                         self.optimizer_norm,
                         self.scheduler_norm),
+
+            PeriodicEval(period=1000,
+                        dataset='DukeMTMC',
+                        model=self.model,
+                        batch_size=128)
         ]
         return ret
 
@@ -436,6 +450,8 @@ class Trainer(object):
     def grad_requires_init(self, model):
         out_requires_grad = dict()
         for name, param in model.named_parameters():
+            if '_mean' in name or '_variance' in name:
+                continue
             out_requires_grad[name] = not param.stop_gradient
         return out_requires_grad
 
@@ -497,10 +513,13 @@ class Trainer(object):
             idx_local = []
             for i, x in enumerate(optimizer._param_groups):
                 split_find_group = find_group[j].split('_')
+                flag_splits = [len(re.compile(split).findall(x['name'])) > 0 for split in split_find_group]
+                '''
                 flag_splits = np.zeros(len(split_find_group), dtype=bool)
                 for k, splits in enumerate(split_find_group):
                     if splits in x['name']:
                         flag_splits[k] = True
+                '''
                 flag_target = all(flag_splits)
                 if flag_target:
                     dict_group[x['name']] = i
@@ -528,7 +547,7 @@ class Trainer(object):
         with EventStorage(start_iter) as self.storage:
             self.before_train() # check hooks.py, engine/defaults.py
             for self.iter in range(start_iter, max_iter):
-                print('iter:', self.iter)
+                print("\niter:", self.iter)
                 self.before_step()
                 if self.cfg['META']['DATA']['NAMES'] == '': # general learning (not meta-learning)
                     self.run_step() # unused
@@ -541,13 +560,11 @@ class Trainer(object):
                     else:
                         max_init = self.meta_param['iter_init_inner']
                     while (self.cnt < max_init):
-                        print('update base model')
                         self.run_step_meta_learning1() # update base model
                         self.cnt += 1
 
                     self.cnt = 0
                     while (self.cnt < self.meta_param['iter_init_outer']):
-                        print('update balancing parameters')
                         self.run_step_meta_learning2() # update balancing parameters (meta-learning)
                         self.cnt += 1
                         self.global_meta_cnt += 1
@@ -589,7 +606,7 @@ class Trainer(object):
                 outs = model(data, opt)
                 loss_dict = model.losses(outs, opt)
                 losses = sum(loss_dict.values())
-                print('loss', losses[0])
+                self.loss_file.write('\t'.join([str(self.iter)]+ [str(float(v.numpy())) for v in loss_dict.values()]) + '\n')
             self._detect_anomaly(losses, loss_dict)
         else:
             losses = None
@@ -636,7 +653,8 @@ class Trainer(object):
         self.data_time_all += data_time
         #!opt['domains'] = data['others']['domains']
         opt['domains'] = data['domains']
-        losses, loss_dict = self.basic_forward(data, self.model, opt) # forward
+        with open(os.path.join(self.output_dir, 'train_loss.csv'), 'a+') as self.loss_file:
+            losses, loss_dict = self.basic_forward(data, self.model, opt) # forward
         
         if self.meta_param['meta_all_params']:
             self.basic_backward(losses, self.optimizer_norm, retain_graph = True) #
@@ -645,7 +663,7 @@ class Trainer(object):
         if self.cnt == 0:
             for name, val in loss_dict.items():
                 t = name_loss+name
-                self.metrics_dict[t] = self.metrics_dict[t] + val if t in self.metrics_dict.keys() else val
+                self.metrics_dict[t] = self.metrics_dict.get(t, 0) + val
             self.print_selected_optimizer('1) after meta-init', self.idx_group, self.optimizer_main, self.meta_param['detail_mode'])
             self.print_selected_optimizer('1) after meta-init', self.idx_group_norm, self.optimizer_norm, self.meta_param['detail_mode'])
 
@@ -785,7 +803,8 @@ class Trainer(object):
                     self.grad_setting('mtrain_both')
                 '''
                 opt['domains'] = data_mtrain['domains']
-                losses, loss_dict = self.basic_forward(data_mtrain, self.model, opt) # forward
+                with open(os.path.join(self.output_dir, 'mtrain_loss.csv'), 'a+') as self.loss_file:
+                    losses, loss_dict = self.basic_forward(data_mtrain, self.model, opt) # forward
                 mtrain_losses.append(losses)
 
                 if self.cnt == 0:
@@ -819,7 +838,8 @@ class Trainer(object):
 
             # self.grad_setting('mtrain_both') # melt both meta_compute and meta_update parameters
             opt['domains'] = data_mtest['domains']
-            losses, loss_dict = self.basic_forward(data_mtest, self.model, opt) # forward
+            with open(os.path.join(self.output_dir, 'mtest_loss.csv'), 'a+') as self.loss_file:
+                losses, loss_dict = self.basic_forward(data_mtest, self.model, opt) # forward
 
             mtest_losses.append(losses)
             if self.cnt == 0:
@@ -1343,10 +1363,12 @@ class Trainer(object):
                             break
 
     @classmethod
-    def test(cls, dataset_name, model, evaluators=None):
-        # TODO
-        results = OrderedDict()
-        data_loader, num_query = build_test_loader_for_m_resnet()
-
+    def test(cls, dataset_name, model, batch_size, evaluator=None):
+        test_loader, num_query= build_reid_test_loader(dataset_name, batch_size, num_workers=0, flag_test=True)
+        if evaluator is None:
+            evaluator = cls.build_evaluator(num_query)
+        metric = inference_on_dataset(model, test_loader, evaluator)
+        print(metric)
+        
 
 

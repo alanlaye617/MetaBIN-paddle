@@ -11,7 +11,6 @@ from data import build_train_loader_for_m_resnet
 from tqdm import tqdm
 
 def loss_test():
-    paddle.device.set_device('gpu:0')
 
     seed = 2022
     np.random.seed(seed)
@@ -33,26 +32,42 @@ def loss_test():
     model_pad.set_state_dict(paddle.load(paddle_path))
  #   model_pad.eval()
 
-    train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['LiteData'], batch_size=16, num_workers=0)
-    for i in tqdm(range(5)):
-        inputs_pad = next(train_loader.__iter__())
-        inputs_ref = translate_inputs_p2t(inputs_pad)
+    train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['Market1501'])
+    for i in tqdm(range(1)):
+        with paddle.no_grad(), torch.no_grad():
+            inputs_pad = next(train_loader.__iter__())
+            inputs_ref = translate_inputs_p2t(inputs_pad)
+            outputs_ref = model_ref(inputs_ref, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
+            losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 
-        outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss', 'SCT', ), 'type_running_stats': 'general', 'each_domain': False})
-        losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT']})
+            reprod_log_ref.add("CEloss_train_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
+            reprod_log_ref.add("Tripletloss_train_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
 
-        reprod_log_ref.add("CEloss_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
-        reprod_log_ref.add("Tripletloss_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
-        reprod_log_ref.add("SCT_%d"%(i), losses_ref['loss_stc'].cpu().detach().numpy())
+            outputs_pad = model_pad(inputs_pad, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
+            losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss']})
 
-        outputs_pad = model_pad(inputs_pad, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss', 'SCT'), 'type_running_stats': 'general', 'each_domain': False})
-        losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT']})
+            reprod_log_pad.add("CEloss_train_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
+            reprod_log_pad.add("Tripletloss_train_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
 
-        reprod_log_pad.add("CEloss_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
-        reprod_log_pad.add("Tripletloss_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
-        reprod_log_pad.add("SCT_%d"%(i), losses_pad['loss_stc'].cpu().detach().numpy())
+            del outputs_pad, outputs_ref, losses_ref, losses_pad, inputs_ref
 
-        del outputs_pad, outputs_ref, losses_ref, losses_pad, inputs_ref
+            outputs_ref = model_ref(inputs_ref, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
+            losses_ref = model_ref.losses(outputs_ref, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT', 'TripletLoss_add']})
+
+            reprod_log_ref.add("CEloss_mtrain_%d"%(i), losses_ref['loss_cls'].cpu().detach().numpy())
+            reprod_log_ref.add("Tripletloss_mtrain_%d"%(i), losses_ref['loss_triplet'].cpu().detach().numpy())
+            reprod_log_ref.add("SCT_mtrain_%d"%(i), losses_ref['loss_stc'].cpu().detach().numpy())
+            reprod_log_ref.add("Tripletloss_add_mtrain_%d"%(i), losses_ref['loss_triplet_add'].cpu().detach().numpy())
+
+            outputs_pad = model_pad(inputs_pad, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
+            losses_pad = model_pad.losses(outputs_pad, opt={'loss':['CrossEntropyLoss', 'TripletLoss', 'SCT', 'TripletLoss_add']})
+
+            reprod_log_pad.add("CEloss_mtrain_%d"%(i), losses_pad['loss_cls'].cpu().detach().numpy())
+            reprod_log_pad.add("Tripletloss_mtrain_%d"%(i), losses_pad['loss_triplet'].cpu().detach().numpy())
+            reprod_log_pad.add("SCT_mtrain_%d"%(i), losses_pad['loss_stc'].cpu().detach().numpy())
+            reprod_log_pad.add("Tripletloss_add_mtrain_%d"%(i), losses_pad['loss_triplet_add'].cpu().detach().numpy())
+
+            del outputs_pad, outputs_ref, losses_ref, losses_pad, inputs_ref
     reprod_log_ref.save('./result/loss_ref.npy')
     reprod_log_pad.save('./result/loss_paddle.npy')
 

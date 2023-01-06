@@ -1,0 +1,5 @@
+[2023/01/02 15:51:54] root INFO: cls_w_mean: 
+[2023/01/02 15:51:54] root INFO: 	mean diff: check passed: True, value: 2.7400945327826776e-05
+[2023/01/02 15:51:54] root INFO: cls_w_std: 
+[2023/01/02 15:51:54] root INFO: 	mean diff: check passed: True, value: 7.582828402519226e-06
+[2023/01/02 15:51:54] root INFO: diff check passed

@@ -18,6 +18,7 @@ from refs.fastreid.evaluation import ReidEvaluator
 from refs.fastreid.solver import build_lr_scheduler, build_optimizer
 from refs.fastreid.utils.checkpoint import Checkpointer
 from refs.fastreid.utils.file_io import PathManager
+from .path import PathManager
 import numpy as np
 from PIL import Image, ImageOps
 import torch
@@ -75,25 +76,23 @@ def create_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True,
     cfg = setup(args)
     return cfg
 
-def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC'], resume=False):
-    cfg = create_cfg()
+def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC'], eval_only=True, resume=False, pretrain=False):
+    cfg = create_cfg(eval_only=eval_only, resume=resume)
 
-    # cfg.MODEL.WEIGHTS = "./logs/Visualize/u01/model_final.pth"
-    # Trainer.resume_or_load(cfg.MODEL.WEIGHTS, resume=args.resume)
     cfg.defrost()
     cfg.DATASETS.NAMES = train_dataset
     cfg.DATASETS.TESTS = test_dataset
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.SOLVER.IMS_PER_BATCH = batch_size
     cfg.TEST.IMS_PER_BATCH = batch_size
-    cfg.MODEL.BACKBONE.PRETRAIN = False
+    cfg.MODEL.BACKBONE.PRETRAIN = pretrain
     trainer = Trainer(cfg)
     if resume:
         trainer.resume_or_load(resume=resume)
     return trainer
 
-def build_ref_model(num_classes, resume=False, pretrain=True):
-    cfg = create_cfg()
+def build_ref_model(num_classes, eval_only=True, resume=False, pretrain=True):
+    cfg = create_cfg(eval_only=eval_only, resume=resume)
     cfg.defrost()
     cfg.MODEL.BACKBONE.PRETRAIN = pretrain
     cfg.MODEL.HEADS.NUM_CLASSES = num_classes
@@ -113,7 +112,6 @@ def build_ref_evaluator(num_query):
 
 
 
-from .path import PathManager
 
 def read_image_ref(file_name, format=None):
     """

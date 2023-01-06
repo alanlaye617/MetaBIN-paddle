@@ -1,11 +1,31 @@
-[2022/12/24 16:39:38] root INFO: CEloss_0: 
-[2022/12/24 16:39:38] root INFO: 	mean diff: check passed: True, value: 4.76837158203125e-07
-[2022/12/24 16:39:38] root INFO: CEloss_1: 
-[2022/12/24 16:39:38] root INFO: 	mean diff: check passed: False, value: 9.5367431640625e-06
-[2022/12/24 16:39:38] root INFO: CEloss_2: 
-[2022/12/24 16:39:38] root INFO: 	mean diff: check passed: False, value: 4.291534423828125e-06
-[2022/12/24 16:39:38] root INFO: CEloss_3: 
-[2022/12/24 16:39:38] root INFO: 	mean diff: check passed: False, value: 2.384185791015625e-06
-[2022/12/24 16:39:38] root INFO: CEloss_4: 
-[2022/12/24 16:39:38] root INFO: 	mean diff: check passed: False, value: 2.5272369384765625e-05
-[2022/12/24 16:39:38] root INFO: diff check failed
+[2023/01/04 22:41:55] root INFO: CEloss_0: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: True, value: 9.5367431640625e-07
+[2023/01/04 22:41:55] root INFO: CEloss_1: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 4.291534423828125e-06
+[2023/01/04 22:41:55] root INFO: CEloss_2: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 7.486343383789062e-05
+[2023/01/04 22:41:55] root INFO: CEloss_3: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0001354217529296875
+[2023/01/04 22:41:55] root INFO: CEloss_4: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0003476142883300781
+[2023/01/04 22:41:55] root INFO: CEloss_5: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0003261566162109375
+[2023/01/04 22:41:55] root INFO: CEloss_6: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0004506111145019531
+[2023/01/04 22:41:55] root INFO: CEloss_7: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 9.965896606445312e-05
+[2023/01/04 22:41:55] root INFO: CEloss_8: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0001888275146484375
+[2023/01/04 22:41:55] root INFO: CEloss_9: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0006656646728515625
+[2023/01/04 22:41:55] root INFO: CEloss_10: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0008778572082519531
+[2023/01/04 22:41:55] root INFO: CEloss_11: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0015115737915039062
+[2023/01/04 22:41:55] root INFO: CEloss_12: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0016932487487792969
+[2023/01/04 22:41:55] root INFO: CEloss_13: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.0008411407470703125
+[2023/01/04 22:41:55] root INFO: CEloss_14: 
+[2023/01/04 22:41:55] root INFO: 	mean diff: check passed: False, value: 0.003773212432861328
+[2023/01/04 22:41:55] root INFO: diff check failed

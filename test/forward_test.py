@@ -5,10 +5,10 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight, build_ref_model, translate_inputs_p2t
+from utils import translate_weight, build_ref_model, build_ref_trainer, translate_inputs_p2t
 from modeling import Metalearning
 from data import build_train_loader_for_m_resnet
-
+from train import Trainer
 
 def forward_test():
     paddle.device.set_device('gpu:0')
@@ -23,17 +23,18 @@ def forward_test():
     torch_path = "./model_weights/model.pth"
     paddle_path = "./model_weights/model.pdparams"
 
-    model_ref = build_ref_model(num_classes=10, resume=True).cuda()
+    #model_ref = build_ref_model(num_classes=751, resume=False, pretrain=False, eval_only=False).cuda()
+    model_ref = build_ref_trainer(batch_size=16, resume=False, pretrain=False).model.cuda()
+    #model_pad = Metalearning(751)
+    model_pad = Trainer(train_batch_size=16).model
+    
     torch.save(model_ref.state_dict(), torch_path)
-#    model_ref.eval()
-
     translate_weight(torch_path, paddle_path)
-
-    model_pad = Metalearning(10)
     model_pad.set_state_dict(paddle.load(paddle_path))
-#    model_pad.eval()
 
-    train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['LiteData'], batch_size=16, num_workers=0)
+#    model_ref.eval()
+#    model_pad.eval()
+    train_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(['Market1501'], batch_size=16, num_workers=0)
     inputs = next(train_loader.__iter__())
     inputs_ref = translate_inputs_p2t(inputs)
     outputs_ref = model_ref(inputs_ref, {'param_update': False, 'loss': ('CrossEntropyLoss', 'TripletLoss'), 'type_running_stats': 'general', 'each_domain': False})

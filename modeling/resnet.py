@@ -91,7 +91,6 @@ class ResNet(nn.Layer):
             x = layer(x, opt)
         return x
 
-
     def random_init(self):
         for _, m in self.named_children():
             if isinstance(m, nn.Conv2D):
@@ -100,6 +99,7 @@ class ResNet(nn.Layer):
             elif isinstance(m, nn.BatchNorm2D):
                 param_init.constant_init(m.weight, 1)
                 param_init.constant_init(m.bias, 0)
+
 
 def build_resnet_backbone():
     # M-resnet50

@@ -9,7 +9,9 @@ from utils import translate_weight, build_ref_trainer, translate_inputs_t2p
 from modeling import Metalearning
 from optim import build_lr_scheduler, build_optimizer
 from tqdm import tqdm
-
+from paddle.optimizer import Momentum
+from refs.fastreid.solver.optim.sgd import SGD
+from train import Trainer
 def backward_test():
     paddle.device.set_device('gpu:0')
 
@@ -39,7 +41,8 @@ def backward_test():
 
     translate_weight(torch_path, paddle_path)
 
-    model_pad = Metalearning(num_classes=751)
+    trainer_pad = Trainer(train_batch_size=batch_size)
+    model_pad = trainer_pad.model
     model_pad.set_state_dict(paddle.load(paddle_path))
 
     scheduler_main_pad = build_lr_scheduler(
@@ -63,8 +66,9 @@ def backward_test():
 
     optimizer_main_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_main_pad, momentum=0.9, flag='main')
     optimizer_norm_pad = build_optimizer(model_pad, base_lr=base_lr, lr_scheduler=scheduler_norm_pad, momentum=0, flag='norm')
-
-    for i in tqdm(range(5)):
+    #optimizer_pad = Momentum(learning_rate=1e-5, momentum=0.9, parameters=model_pad.parameters())
+    #optimizer_ref = SGD(params=model_ref.parameters(), lr=1e-5, momentum=0.9)
+    for i in tqdm(range(15)):
         inputs_ref = next(train_loader.__iter__())
        # inputs_ref = translate_inputs_p2t(inputs_pad)
         outputs_ref = model_ref(inputs_ref, {'param_update': False, 'type_running_stats': 'general', 'each_domain': False})
@@ -84,7 +88,7 @@ def backward_test():
         losses_ref['loss_cls'].backward()
         losses_pad['loss_cls'].backward()
         '''
-        if i == 1:
+        if i == 0:
             for key, value in model_ref.named_parameters():
                 if 'fc' not in key and 'mean' not in key and 'var' not in key and value.grad is not None:
                     if 'heads.classifier_norm.weight' in key:
@@ -95,21 +99,24 @@ def backward_test():
                     if 'ins_n' in key:
                         key = key.replace('scale', 'weight')
                     reprod_log_pad.add(key+'_grad', value.grad.cpu().detach().numpy())
-        '''    
+        '''
+        #optimizer_pad.step()
+        #optimizer_ref.step()
+
         optimizer_main_ref.step()
         scheduler_main_ref.step()
 
-    #    optimizer_norm_ref.step()
-    #    scheduler_norm_ref.step()
+        optimizer_norm_ref.step()
+        scheduler_norm_ref.step()
 
         optimizer_main_pad.step()
         scheduler_main_pad.step()
 
-    #    optimizer_norm_pad.step()
-    #    scheduler_norm_pad.step()
+        optimizer_norm_pad.step()
+        scheduler_norm_pad.step()
 
         '''
-        if i == 1:
+        if i == 0:
             for key, value in model_ref.named_parameters():
                 if 'fc' not in key and 'mean' not in key and 'var' not in key:
                     reprod_log_ref.add(key+'_value', value.data.cpu().detach().numpy())
@@ -123,6 +130,8 @@ def backward_test():
         optimizer_main_pad.clear_grad()
         optimizer_norm_ref.zero_grad()
         optimizer_norm_pad.clear_grad()
+        #optimizer_pad.clear_grad()
+        #optimizer_ref.zero_grad()
 
     reprod_log_ref.save('./result/backward_ref.npy')
     reprod_log_pad.save('./result/backward_paddle.npy')

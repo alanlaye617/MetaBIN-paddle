@@ -53,7 +53,19 @@ class HookBase:
         pass
 
 
+class PeriodicEval(HookBase):
+    def __init__(self, period, dataset, model, batch_size) -> None:
+        super().__init__()
+        self.dataset = dataset
+        self.model = model
+        self.period = period
+        self.batch_size = batch_size
+        self.count = 0
 
+    def after_step(self):
+        self.count += 1
+        if self.count and self.count % self.period == 0:
+            self.trainer.test(dataset_name=self.dataset, model=self.model, batch_size=self.batch_size)
 
 class LRScheduler(HookBase):
     """

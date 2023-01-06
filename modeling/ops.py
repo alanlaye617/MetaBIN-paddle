@@ -62,6 +62,8 @@ def update_parameter(param, step_size, opt = None):
 
 class meta_linear(nn.Linear):
     def __init__(self, in_features, out_features, weight_attr=None, bias_attr=None, name=None):
+        if weight_attr is None:
+            weight_attr=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity='leaky_relu')
         super().__init__(in_features, out_features, weight_attr, bias_attr, name)
 
     def forward(self, input, opt = None):
