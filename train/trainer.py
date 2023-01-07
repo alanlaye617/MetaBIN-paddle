@@ -189,6 +189,7 @@ class MResNetTrainer(Trainer):
                 mtest_losses = paddle.sum(paddle.stack(mtest_losses))
 
         if self.meta_param['loss_combined']:
+            raise AssertionError
             total_losses = self.meta_param['loss_weight'] * mtrain_losses + mtest_losses
         else:
             total_losses = mtest_losses

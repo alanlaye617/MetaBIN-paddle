@@ -591,7 +591,7 @@ class Trainer(object):
         else:
             losses = None
             loss_dict = dict()
-        # print(loss_dict)
+        print(self.iter, {k: float(v.numpy()) for k, v in loss_dict.items()})
         return losses, loss_dict
 
     #####################################################################
@@ -609,8 +609,9 @@ class Trainer(object):
                 # paddle.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
                 self.scaler.step(optimizer)
                 self.scaler.update()
-            for p in self.bin_gates:
-                p = p.clip(min=0, max=1)
+            # TODO fix bug
+            #for p in self.bin_gates:
+            #    p.clip_(min=0, max=1)
 
     #####################################################################
     # base model updates (not meta-learning)

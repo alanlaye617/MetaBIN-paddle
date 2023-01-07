@@ -59,7 +59,7 @@ class meta_conv2d(nn.Conv2D):
 
 
 class meta_bin(nn.Layer):
-    def __init__(self, num_features, norm_opt=None, compute_meta_gate=True, **kwargs):
+    def __init__(self, num_features, norm_opt=None, compute_meta_gates=True, **kwargs):
         super().__init__()
         self.bat_n = meta_bn(num_features, norm_opt, **kwargs)
         self.ins_n = meta_in(num_features, norm_opt, **kwargs)
@@ -73,25 +73,23 @@ class meta_bin(nn.Layer):
             gate_init = nn.initializer.Uniform(0, 1)
         self.gate = paddle.create_parameter([num_features], dtype='float32', default_initializer=gate_init)
         setattr(self.gate, 'bin_gate', True)
-        self.compute_meta_gate = compute_meta_gate
+        self.compute_meta_gates = compute_meta_gates
 
     def forward(self, inputs, opt=None):
         if inputs.dim() != 4:
             raise ValueError('expected 4D input (got {}D input)'.format(inputs.dim()))
-        param_update = (opt != None) and opt.get('param_update', False) and self.compute_meta_gate
+        param_update = (opt != None) and opt.get('param_update', False) and self.compute_meta_gates
 
         if param_update and (self.gate is not None) and (self.gate.grad is not None) and (not self.gate.stop_gradient):
             lr_g = opt['meta_ratio'] * opt['norm_lr'] * self.gate.optimize_attr.get('learning_rate', 1.0)
             update_gate = self.gate - lr_g * self.gate.grad
             if opt['inner_clamp']:
-                # update_gate.data.clamp_(min=0, max=1)
-                update_gate = update_gate.clip(min=0, max=1)
-            # print(update_gate[0].data.cpu())
+                update_gate.clip_(min=0, max=1)
         else:
             update_gate = self.gate
         out_bn = self.bat_n(inputs, opt)
         out_in = self.ins_n(inputs, opt)
-        update_gate = update_gate.unsqueeze([0, -1, -1]).astype(out_bn.dtype)
+        update_gate = update_gate.clip(min=0, max=1).unsqueeze([0, -1, -1]).astype(out_bn.dtype)
         out = out_bn * update_gate + out_in * (1 - update_gate)
         return out
 
@@ -105,7 +103,7 @@ class meta_bn(nn.BatchNorm2D):
         if not bias_freeze:
             bias_freeze = norm_opt['BN_B_FREEZE']
         use_global_stats = norm_opt['BN_RUNNING']
-        self.affine = False
+        self.affine = True
         super().__init__(num_features, momentum, epsilon, weight_attr, bias_attr, data_format, use_global_stats, name)
         self.weight.stop_gradient = weight_freeze
         self.bias.stop_gradient = bias_freeze
@@ -165,10 +163,8 @@ class meta_in(nn.InstanceNorm2D):
             weight_freeze = norm_opt['IN_W_FREEZE']
         if not bias_freeze:
             bias_freeze = norm_opt['IN_B_FREEZE']
-        self.affine = False
+        self.affine = True
         use_global_stats = norm_opt['IN_RUNNING']
-        self._mean = None
-        self._variance = None
         super().__init__(num_features, epsilon, momentum, weight_attr, bias_attr, data_format, name)
         self.in_fc_multiply = norm_opt['IN_FC_MULTIPLY']
         self._momentum = momentum
@@ -208,7 +204,7 @@ class meta_in(nn.InstanceNorm2D):
 
 
             if norm_type == "general":
-                return F.instance_norm(inputs, self._mean, self._variance,
+                return F.instance_norm(inputs, None, None,
                                        updated_scale, updated_bias,
                                        self.training, self._momentum, self._epsilon)
             elif norm_type == "hold":
@@ -221,7 +217,7 @@ class meta_in(nn.InstanceNorm2D):
                                            updated_scale, updated_bias,
                                            True, self._momentum, self._epsilon)
                 else:
-                    return F.instance_norm(inputs, self._mean, self._variance,
+                    return F.instance_norm(inputs, None, None,
                                            updated_scale, updated_bias,
                                            False, self._momentum, self._epsilon)    
     
