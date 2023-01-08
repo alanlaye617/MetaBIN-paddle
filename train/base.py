@@ -420,8 +420,12 @@ class Trainer(object):
                         self.scheduler_main,
                         self.optimizer_norm,
                         self.scheduler_norm),
+            PeriodicEval(period=400,
+                        dataset='Market1501',
+                        model=self.model,
+                        batch_size=128),
 
-            PeriodicEval(period=1000,
+            PeriodicEval(period=400,
                         dataset='DukeMTMC',
                         model=self.model,
                         batch_size=128)

@@ -212,12 +212,8 @@ class meta_in(nn.InstanceNorm2D):
                                        updated_scale, updated_bias,
                                        self.training, self._momentum, self._epsilon)
             elif norm_type == "eval":
-                if self._mean is None:
-                    return F.instance_norm(inputs, None, None,
-                                           updated_scale, updated_bias,
-                                           True, self._momentum, self._epsilon)
-                else:
-                    return F.instance_norm(inputs, None, None,
-                                           updated_scale, updated_bias,
-                                           False, self._momentum, self._epsilon)    
+                return F.instance_norm(inputs, None, None,
+                                        updated_scale, updated_bias,
+                                        True, self._momentum, self._epsilon)
+ 
     
