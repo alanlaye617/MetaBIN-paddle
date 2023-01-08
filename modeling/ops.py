@@ -2,7 +2,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import math
-import copy
+
 
 class meta_linear(nn.Linear):
     def __init__(self, in_features, out_features, weight_attr=None, bias_attr=None, compute_meta_params=False, name=None):
@@ -89,7 +89,7 @@ class meta_bin(nn.Layer):
             update_gate = self.gate
         out_bn = self.bat_n(inputs, opt)
         out_in = self.ins_n(inputs, opt)
-        update_gate = update_gate.clip(min=0, max=1).unsqueeze([0, -1, -1]).astype(out_bn.dtype)
+        update_gate = update_gate.unsqueeze([0, -1, -1]).astype(out_bn.dtype)
         out = out_bn * update_gate + out_in * (1 - update_gate)
         return out
 

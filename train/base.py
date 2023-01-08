@@ -609,9 +609,8 @@ class Trainer(object):
                 # paddle.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
                 self.scaler.step(optimizer)
                 self.scaler.update()
-            # TODO fix bug
-            #for p in self.bin_gates:
-            #    p.clip_(min=0, max=1)
+            for i in range(len(self.bin_gates)):
+                self.bin_gates[i].set_value(self.bin_gates[i].clip(0, 1))
 
     #####################################################################
     # base model updates (not meta-learning)

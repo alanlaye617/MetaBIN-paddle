@@ -147,6 +147,7 @@ class MResNetTrainer(Trainer):
             # self.grad_setting('mtrain_single') # melt only meta_compute parameters
             opt = self.opt_setting('mtest') # auto_grad based on requires_grad of model
             if losses:
+                self.optimizer_norm.clear_grad()
                 losses.backward()
             '''
             print_grad_mean_list = list()
