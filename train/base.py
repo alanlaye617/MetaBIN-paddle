@@ -22,17 +22,18 @@ from .hooks import *
 logger = logging.getLogger(__name__)
 
 class Trainer(object):
-    def __init__(self, train_batch_size=None, mode='M-ResNet', output_dir='logs') -> None:
+    def __init__(self, train_batch_size=None, num_workers=2, mode='M-ResNet', output_dir='logs') -> None:
         self._hooks = []
         self.output_dir = output_dir
         assert mode in ['M-ResNet']
         self.cfg = self.get_cfg(mode)
         if train_batch_size != None: self.cfg['SOLVER']['IMS_PER_BATCH'] = train_batch_size
-
+        
         self.data_loader, mtrain_loader, mtest_loader, num_domains = build_train_loader_for_m_resnet(
             dataset_list=self.cfg['DATASETS']['NAMES'],
             batch_size=self.cfg['SOLVER']['IMS_PER_BATCH'],
             num_instance=self.cfg['DATALOADER']['NUM_INSTANCE'],
+            num_workers=num_workers,
             world_size=1)
         
         self.cfg['META']['DATA']['NUM_DOMAINS'] = num_domains
@@ -420,11 +421,11 @@ class Trainer(object):
                         self.scheduler_main,
                         self.optimizer_norm,
                         self.scheduler_norm),
-            PeriodicEval(period=400,
-                        dataset='Market1501',
-                        model=self.model,
-                        batch_size=128),
-
+            #PeriodicEval(period=400,
+            #            dataset='Market1501',
+            #            model=self.model,
+            #            batch_size=128),
+            #
             PeriodicEval(period=400,
                         dataset='DukeMTMC',
                         model=self.model,
@@ -1306,13 +1307,17 @@ class Trainer(object):
                             val = paddle.sum(param - optimizer.param_groups[x]['params'][0])
                             break
 
-    @classmethod
-    def test(cls, dataset_name, model, batch_size, evaluator=None):
-        test_loader, num_query= build_reid_test_loader(dataset_name, batch_size, num_workers=0, flag_test=True)
+    def test(self, dataset_name, model, batch_size, num_workers=2, evaluator=None):
+        test_loader, num_query= build_reid_test_loader(dataset_name, batch_size, num_workers=num_workers, flag_test=True)
         if evaluator is None:
-            evaluator = cls.build_evaluator(num_query)
+            evaluator = self.build_evaluator(num_query)
         metric = inference_on_dataset(model, test_loader, evaluator)
+        with open(os.path.join(self.output_dir, 'metric'+ dataset_name +'.csv'), 'a+') as metric_file:
+            metric_file.write('\t'.join([str(self.iter)]+ [str(v) for v in metric.values()]) + '\n')
+        print('*'*50)
+        print(dataset_name, self.iter)
         print(metric)
+        print('*'*50)
         
 
 

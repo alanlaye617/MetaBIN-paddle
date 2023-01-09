@@ -53,6 +53,10 @@ class HookBase:
         pass
 
 
+class Logger(HookBase):
+    def __init__(self) -> None:
+        super().__init__()
+
 class PeriodicEval(HookBase):
     def __init__(self, period, dataset, model, batch_size) -> None:
         super().__init__()
