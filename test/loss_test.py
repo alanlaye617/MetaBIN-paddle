@@ -6,7 +6,7 @@ import random
 import sys
 sys.path.append('.')
 from utils import translate_weight, build_ref_model, translate_inputs_p2t
-from modeling import Metalearning
+from arch import Metalearning
 from data import build_train_loader_for_m_resnet
 from tqdm import tqdm
 

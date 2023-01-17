@@ -2,12 +2,12 @@ import sys
 sys.path.append('.')
 import paddle
 import torch
-from train import Trainer
+from engine import Trainer
 from utils.build_ref import build_ref_trainer
 from reprod_log import ReprodLogger, ReprodDiffHelper
 from utils import translate_weight, translate_inputs_p2t, translate_params_name_t2p
 from utils.build_ref import build_ref_model
-from modeling import Metalearning
+from arch import Metalearning
 from data import build_train_loader_for_m_resnet
 from tqdm import tqdm
 from paddle.optimizer import Momentum

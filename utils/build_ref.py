@@ -76,15 +76,15 @@ def create_cfg(config_file='./refs/configs/Sample/M-resnet.yml', eval_only=True,
     cfg = setup(args)
     return cfg
 
-def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC'], eval_only=True, resume=False, pretrain=False):
+def build_ref_trainer(batch_size, train_dataset=['Market1501'], test_dataset=['Market1501', 'DukeMTMC'], eval_only=True, resume=False, pretrain=True):
     cfg = create_cfg(eval_only=eval_only, resume=resume)
-
     cfg.defrost()
     cfg.DATASETS.NAMES = train_dataset
     cfg.DATASETS.TESTS = test_dataset
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.SOLVER.IMS_PER_BATCH = batch_size
-    cfg.TEST.IMS_PER_BATCH = batch_size
+    cfg.META.MTRAIN_MINI_BATCH = batch_size
+    cfg.META.MTEST_MINI_BATCH = batch_size
     cfg.MODEL.BACKBONE.PRETRAIN = pretrain
     trainer = Trainer(cfg)
     if resume:
@@ -109,8 +109,6 @@ def build_ref_evaluator(num_query):
     cfg = create_cfg()
     cfg.defrost()
     return ReidEvaluator(cfg, num_query)
-
-
 
 
 def read_image_ref(file_name, format=None):

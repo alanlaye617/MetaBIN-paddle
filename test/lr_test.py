@@ -1,6 +1,6 @@
 import sys
 sys.path.append('.')
-from train import Trainer
+from engine import Trainer
 from utils.build_ref import build_ref_trainer
 from utils import translate_params_name_t2p
 from tqdm import tqdm

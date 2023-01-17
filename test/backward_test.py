@@ -6,12 +6,12 @@ from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
 from utils import translate_weight, build_ref_trainer, translate_inputs_t2p
-from modeling import Metalearning
 from optim import build_lr_scheduler, build_optimizer
 from tqdm import tqdm
-from paddle.optimizer import Momentum
 from refs.fastreid.solver.optim.sgd import SGD
-from train import Trainer
+from engine import Trainer
+
+
 def backward_test():
     paddle.device.set_device('gpu:0')
 

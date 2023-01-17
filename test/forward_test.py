@@ -5,10 +5,9 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight, build_ref_model, build_ref_trainer, translate_inputs_p2t
-from modeling import Metalearning
+from utils import translate_weight, build_ref_trainer, translate_inputs_p2t
 from data import build_train_loader_for_m_resnet
-from train import Trainer
+from engine import Trainer
 
 def forward_test():
     paddle.device.set_device('gpu:0')
