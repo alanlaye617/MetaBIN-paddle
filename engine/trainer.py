@@ -23,11 +23,10 @@ from .hooks import *
 logger = logging.getLogger(__name__)
 
 class Trainer(object):
-    def __init__(self, batch_size=None, num_workers=2, mode='M-ResNet', output_dir='logs') -> None:
+    def __init__(self, cfg, batch_size=None, num_workers=4, mode='M-ResNet', output_dir='logs') -> None:
         self._hooks = []
         self.output_dir = output_dir
-        assert mode in ['M-ResNet']
-        self.cfg = self.get_cfg(mode)
+        self.cfg = self.get_cfg(cfg)
         if batch_size != None: 
             self.cfg['SOLVER']['IMS_PER_BATCH'] = batch_size
             self.cfg['META']['MTRAIN_MINI_BATCH'] = batch_size
@@ -361,8 +360,7 @@ class Trainer(object):
         self.register_hooks(self.build_hooks())
 
     @staticmethod
-    def get_cfg(mode, root='./configs'):
-        path = os.path.join(root, mode+".yaml")
+    def get_cfg(path):
         with open(path, encoding="UTF-8") as cfg_file:
             cfg = yaml.load(cfg_file, Loader=yaml.FullLoader)
         return cfg

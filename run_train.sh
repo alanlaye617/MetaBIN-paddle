@@ -1,0 +1,1 @@
+python run_train.py --config=".\configs\M-ResNet.yaml" --batch_size=96 --num_workers=4 --seed=0
