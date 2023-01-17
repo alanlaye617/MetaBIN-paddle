@@ -5,10 +5,10 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight, build_ref_trainer, translate_inputs_t2p
+from utils import translate_weight, translate_inputs_t2p
+from utils.build_ref import build_ref_trainer
 from optim import build_lr_scheduler, build_optimizer
 from tqdm import tqdm
-from refs.fastreid.solver.optim.sgd import SGD
 from engine import Trainer
 
 

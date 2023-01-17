@@ -1,7 +1,6 @@
 import sys
 sys.path.append('.')
-from utils import build_ref_trainer
-from utils import read_image_ref
+from utils.build_ref import read_image_ref, build_ref_trainer
 from data.datasets.utils import read_image as read_image_pad
 from data import build_reid_test_loader
 import numpy as np

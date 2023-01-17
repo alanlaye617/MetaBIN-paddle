@@ -5,7 +5,8 @@ import numpy as np
 from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 sys.path.append('.')
-from utils import translate_weight, build_ref_trainer, translate_inputs_p2t
+from utils import translate_weight, translate_inputs_p2t
+from utils.build_ref import build_ref_trainer
 from data import build_train_loader_for_m_resnet
 from engine import Trainer
 

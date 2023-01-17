@@ -5,7 +5,8 @@ from reprod_log import ReprodLogger, ReprodDiffHelper
 import random
 import sys
 sys.path.append('.')
-from utils import translate_weight, build_ref_trainer, build_ref_evaluator, translate_inputs_p2t
+from utils import translate_weight
+from utils.build_ref import build_ref_trainer
 from arch import Metalearning
 from data import build_reid_test_loader
 from evaluation import ReidEvaluator 
