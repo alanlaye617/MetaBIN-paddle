@@ -1,0 +1,1 @@
+python run_eval.py --config=".\configs\M-ResNet.yaml" --weight=".\model_weights\final.pdparams" --batch_size=128 --dataset="Market1501" --num_workers=4 --seed=0
